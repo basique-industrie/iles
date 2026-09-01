@@ -1,0 +1,39 @@
+import AppKit
+import Infrastructure
+import SwiftUI
+import IlesCore
+
+@main
+struct IlesApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
+    var body: some Scene {
+        MenuBarExtra("Iles", systemImage: "circle.hexagonpath.fill") {
+            Button("Settings…") {
+                appDelegate.showSettings()
+            }
+            .keyboardShortcut(",", modifiers: .command)
+            Button("Refresh Sources") {
+                appDelegate.refresh()
+            }
+            .keyboardShortcut("r", modifiers: .command)
+            Button(appDelegate.usesDemoData ? "Demo Data" : "Live Data") {}
+                .disabled(true)
+            Divider()
+            Toggle(
+                "Launch at Login",
+                isOn: Binding(
+                    get: { appDelegate.launchesAtLogin },
+                    set: { appDelegate.setLaunchAtLogin($0) }
+                )
+            )
+            Button("Open Logs") {
+                AppLog.openLogsDirectory()
+            }
+            Divider()
+            Button("Quit Iles") {
+                NSApp.terminate(nil)
+            }
+        }
+    }
+}

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>Iles</string>
+	<key>CFBundleIconFile</key>
+	<string>Iles.icns</string>
+    <key>CFBundleExecutable</key>
+    <string>Iles</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.jean.iles</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>Iles</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>CFBundleVersion</key>
+    <string>11</string>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.utilities</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>26.0</string>
+    <key>LSMultipleInstancesProhibited</key>
+    <true/>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>Iles reads your upcoming events to show meeting, schedule, and countdown complications.</string>
+    <key>NSRemindersFullAccessUsageDescription</key>
+    <string>Iles reads incomplete reminders to show due and overdue task complications.</string>
+	<key>NSHumanReadableCopyright</key>
+	<string>Copyright © 2026 Jean Humann. Released under the MIT License.</string>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+    <key>NSSupportsAutomaticTermination</key>
+    <false/>
+    <key>NSSupportsSuddenTermination</key>
+    <false/>
+</dict>
+</plist>
