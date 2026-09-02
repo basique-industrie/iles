@@ -30,7 +30,6 @@ struct IslandInspector: View {
                 Button(role: .destructive, action: delete) {
                     Label("Delete Island", systemImage: "trash")
                 }
-                .disabled(runtime.workspaceStore.islands.count == 1)
             } label: {
                 RowActionGlyph(symbol: "ellipsis")
             }

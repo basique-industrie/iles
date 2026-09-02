@@ -273,26 +273,43 @@ public struct IslandConfiguration: Codable, Equatable, Identifiable, Sendable {
 
 public struct IslandWorkspace: Codable, Equatable, Sendable {
     public var islands: [IslandConfiguration]
+    /// Placement of the empty-workspace plus pill, reused when the first island is added.
+    public var emptyIslandPlacement: IslandPlacementConfiguration
 
-    public init(islands: [IslandConfiguration]) {
+    public init(
+        islands: [IslandConfiguration],
+        emptyIslandPlacement: IslandPlacementConfiguration = .init()
+    ) {
         self.islands = islands
+        self.emptyIslandPlacement = emptyIslandPlacement
     }
 
     public static var defaultWorkspace: IslandWorkspace {
-        IslandWorkspace(islands: [
-            IslandConfiguration(
-                name: "Main Island",
-                complications: [
-                    ComplicationConfiguration(sourceID: "claude", metricIDs: ["quota.session"]),
-                    ComplicationConfiguration(sourceID: "codex", metricIDs: ["quota.session"]),
-                    ComplicationConfiguration(sourceID: "cursor", metricIDs: ["quota.key.model:Cursor Models"]),
-                ]
-            ),
-        ])
+        IslandWorkspace(islands: [])
     }
 
     public var referencedSourceIDs: Set<String> {
         Set(islands.flatMap(\.complications).map(\.sourceID))
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case islands
+        case emptyIslandPlacement
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        islands = try container.decode([IslandConfiguration].self, forKey: .islands)
+        emptyIslandPlacement = try container.decodeIfPresent(
+            IslandPlacementConfiguration.self,
+            forKey: .emptyIslandPlacement
+        ) ?? .init()
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(islands, forKey: .islands)
+        try container.encode(emptyIslandPlacement, forKey: .emptyIslandPlacement)
     }
 }
 

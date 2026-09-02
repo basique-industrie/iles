@@ -7,6 +7,16 @@ string with no leading `v`. Tags add the `v`.
 
 ## Unreleased
 
+### Changed
+
+- A new install starts with an empty workspace. The edge plus opens Settings,
+  or brings the existing Settings window forward if it is already open.
+
+### Fixed
+
+- ⌘-drag now moves the empty-workspace plus pill, and the first added island
+  keeps that placement.
+
 ## 0.1.0-beta.2 - 2026-09-03
 
 ### Fixed

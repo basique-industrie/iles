@@ -60,9 +60,10 @@ Iles:
 - trusts local extensions by content fingerprint, without a marketplace or
   automatic update.
 
-The default workspace is one right-edge island with Claude, Codex, and Cursor
-rings. Starter collections add coherent stacks for AI, Mac health, coding
-focus, day planning, shipping, or service monitoring.
+A new install starts with no islands. The edge plus opens Settings so you can
+add an island and choose complications. Starter collections add coherent stacks
+for AI, Mac health, coding focus, day planning, shipping, or service
+monitoring.
 
 ## Install
 

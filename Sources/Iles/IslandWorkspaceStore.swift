@@ -68,12 +68,15 @@ final class IslandWorkspaceStore {
 
     func addIsland() {
         let number = islands.count + 1
-        let island = IslandConfiguration(
-            name: "Island \(number)",
-            placement: IslandPlacementConfiguration(
+        let placement = islands.isEmpty
+            ? workspace.emptyIslandPlacement
+            : IslandPlacementConfiguration(
                 mode: .automatic,
                 topGap: 8 + Double((islands.count % 4) * 120)
             )
+        let island = IslandConfiguration(
+            name: "Island \(number)",
+            placement: placement
         )
         workspace.islands.append(island)
         selectedIslandID = island.id
@@ -114,13 +117,15 @@ final class IslandWorkspaceStore {
 
     @discardableResult
     func removeIsland(_ id: UUID) -> IslandRemoval? {
-        guard workspace.islands.count > 1,
-              let index = workspace.islands.firstIndex(where: { $0.id == id })
-        else { return nil }
+        guard let index = workspace.islands.firstIndex(where: { $0.id == id }) else { return nil }
         let removed = workspace.islands.remove(at: index)
+        if workspace.islands.isEmpty {
+            workspace.emptyIslandPlacement = removed.placement
+        }
         if selectedIslandID == id {
-            let next = workspace.islands[min(index, workspace.islands.count - 1)]
-            selectedIslandID = next.id
+            selectedIslandID = workspace.islands.isEmpty
+                ? nil
+                : workspace.islands[min(index, workspace.islands.count - 1)].id
             selectedComplicationID = nil
         }
         persist()
@@ -133,6 +138,11 @@ final class IslandWorkspaceStore {
         workspace.islands.insert(removal.island, at: index)
         selectedIslandID = removal.island.id
         selectedComplicationID = nil
+        persist()
+    }
+
+    func updateEmptyIslandPlacement(_ update: (inout IslandPlacementConfiguration) -> Void) {
+        update(&workspace.emptyIslandPlacement)
         persist()
     }
 
@@ -279,7 +289,6 @@ final class IslandWorkspaceStore {
     }
 
     private static func sanitized(_ workspace: IslandWorkspace) -> IslandWorkspace {
-        guard !workspace.islands.isEmpty else { return .defaultWorkspace }
         var copy = workspace
         var islandIDs = Set<UUID>()
         for index in copy.islands.indices {

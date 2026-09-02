@@ -89,18 +89,39 @@ extension IlesSelfTests {
             defer { box.tearDown() }
             let repository = JSONIslandWorkspaceRepository(store: box.store)
             let workspace = IslandWorkspaceStore(repository: repository)
-            test.expectEqual(workspace.islands.count, 1, "empty store seeds one island")
-            test.expectEqual(
-                workspace.islands[0].complications.map(\.sourceID),
-                ["claude", "codex", "cursor"],
-                "default island seeds Claude, Codex, and Cursor"
+            test.expectEqual(workspace.islands.count, 0, "empty store seeds no islands")
+            test.expect(
+                workspace.selectedIslandID == nil,
+                "an empty workspace has no selected island"
             )
+            workspace.updateEmptyIslandPlacement {
+                $0.mode = .manual
+                $0.edge = .leading
+                $0.topGap = 144
+            }
+            workspace.addIsland()
+            test.expectEqual(
+                workspace.islands[0].placement.edge,
+                .leading,
+                "the first island keeps the empty-workspace placement"
+            )
+            test.expectEqual(
+                workspace.islands[0].placement.topGap,
+                144,
+                "the first island keeps the empty-workspace top gap"
+            )
+            test.expectEqual(
+                workspace.islands[0].placement.mode,
+                .manual,
+                "the first island keeps the empty-workspace placement mode"
+            )
+            test.expectEqual(workspace.islands.count, 1, "island can be added")
             test.expect(
                 workspace.selectedComplicationID == nil,
                 "opening an island workspace defaults to the island inspector"
             )
             workspace.addIsland()
-            test.expectEqual(workspace.islands.count, 2, "island can be added")
+            test.expectEqual(workspace.islands.count, 2, "a second island can be added")
             if let secondID = workspace.selectedIslandID {
                 _ = workspace.addComplication(
                     to: secondID,
@@ -181,8 +202,8 @@ extension IlesSelfTests {
             )
             test.expectEqual(
                 reloaded.workspace.referencedSourceIDs,
-                Set(["claude", "codex", "cursor"]),
-                "source references deduplicate across instances"
+                Set(["claude"]),
+                "source references come only from configured complications"
             )
         }
 
@@ -201,13 +222,53 @@ extension IlesSelfTests {
         }
 
         do {
+            let decoded = try JSONDecoder().decode(
+                IslandWorkspace.self,
+                from: Data(#"{"islands":[]}"#.utf8)
+            )
+            test.expectEqual(decoded.islands.count, 0, "legacy empty workspace decodes")
+            test.expectEqual(
+                decoded.emptyIslandPlacement.edge,
+                .trailing,
+                "legacy workspaces default the empty pill to the trailing edge"
+            )
+        } catch {
+            test.expect(false, "legacy empty workspace decodes: \(error)")
+        }
+
+        do {
+            let box = IsolatedBox.make()
+            defer { box.tearDown() }
+            let workspace = IslandWorkspaceStore(
+                repository: JSONIslandWorkspaceRepository(store: box.store)
+            )
+            workspace.addIsland()
+            workspace.updateIsland(workspace.islands[0].id) {
+                $0.placement.mode = .manual
+                $0.placement.topGap = 96
+            }
+            _ = workspace.removeIsland(workspace.islands[0].id)
+            test.expectEqual(
+                workspace.workspace.emptyIslandPlacement.topGap,
+                96,
+                "removing the last island keeps its placement for the empty pill"
+            )
+            workspace.addIsland()
+            test.expectEqual(
+                workspace.islands[0].placement.topGap,
+                96,
+                "re-adding the first island restores the last empty placement"
+            )
+        }
+
+        do {
             let box = IsolatedBox.make()
             defer { box.tearDown() }
             box.store.write(value: ["islands": "invalid"], key: "workspace")
             let workspace = IslandWorkspaceStore(
                 repository: JSONIslandWorkspaceRepository(store: box.store)
             )
-            test.expectEqual(workspace.islands.count, 1, "invalid workspace data falls back safely")
+            test.expectEqual(workspace.islands.count, 0, "invalid workspace data falls back to an empty workspace")
         }
 
     }

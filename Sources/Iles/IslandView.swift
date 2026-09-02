@@ -1,3 +1,4 @@
+import AppKit
 import Domain
 import IslandGeometry
 import SwiftUI
@@ -86,14 +87,45 @@ struct IslandView: View {
     }
 
     private var emptyState: some View {
+        IslandPlusAffordance {
+            runtime.workspaceStore.selectIsland(islandID)
+            NotificationCenter.default.post(name: .showIslandSettings, object: nil)
+        }
+    }
+}
+
+/// Edge pill shown when the workspace has no islands.
+struct EmptyWorkspaceIslandView: View {
+    var edge: IslandEdge = .trailing
+
+    var body: some View {
+        let mirrored = edge == .leading
+        IslandPlusAffordance {
+            NotificationCenter.default.post(name: .showIslandSettings, object: nil)
+        }
+        .padding(.horizontal, IslandMetrics.leadingInset)
+        .frame(width: IslandMetrics.width, height: IslandMetrics.height(forProviderCount: 0))
+        .background {
+            IslandShape(mirrored: mirrored)
+                .fill(IslandPalette.surface)
+        }
+        .contentShape(IslandShape(mirrored: mirrored))
+        .accessibilityLabel("Add an island")
+        .accessibilityAddTraits(.isButton)
+    }
+}
+
+private struct IslandPlusAffordance: View {
+    let action: () -> Void
+
+    var body: some View {
         Image(systemName: "plus")
             .font(.system(size: 13, weight: .medium))
             .foregroundStyle(IslandPalette.label)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .onTapGesture {
-                guard interactive else { return }
-                runtime.workspaceStore.selectIsland(islandID)
-                NotificationCenter.default.post(name: .showIslandSettings, object: nil)
+                guard !NSEvent.modifierFlags.contains(.command) else { return }
+                action()
             }
     }
 }

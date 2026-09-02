@@ -71,7 +71,6 @@ struct IslandWorkspaceEditor: View {
                         .listRowBackground(Color.clear)
                         .destructiveSwipeAction(
                             accessibilityName: "Delete \(island.name)",
-                            isEnabled: runtime.workspaceStore.islands.count > 1,
                             actionWidth: 56,
                             actionHeight: 56
                         ) {
@@ -141,7 +140,6 @@ struct IslandWorkspaceEditor: View {
             Divider()
             Button("Duplicate") { runtime.workspaceStore.duplicateIsland(island.id) }
             Button("Delete", role: .destructive) { deleteIsland(island) }
-                .disabled(runtime.workspaceStore.islands.count == 1)
         }
     }
 
@@ -177,6 +175,8 @@ struct IslandWorkspaceEditor: View {
                 }
                 .clipShape(RoundedRectangle(cornerRadius: IslandChrome.cardRadius, style: .continuous))
                 .frame(maxHeight: .infinity)
+            } else {
+                emptyIslandsCanvas
             }
         }
         .padding(IslandChrome.pageInset)
@@ -315,6 +315,25 @@ struct IslandWorkspaceEditor: View {
             .padding(.horizontal, 10)
             .frame(height: 44)
         }
+    }
+
+    private var emptyIslandsCanvas: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "plus.circle")
+                .font(.system(size: 22, weight: .medium))
+            Text("No islands yet")
+                .font(.system(size: 13, weight: .semibold))
+            Text("Add an island, then choose complications for the desktop edge.")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(IslandChrome.secondaryText)
+                .multilineTextAlignment(.center)
+            QuietButton(title: "Add Island", symbol: "plus", prominence: .primary) {
+                runtime.workspaceStore.addIsland()
+            }
+        }
+        .foregroundStyle(.white)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(24)
     }
 
     private var emptyComplications: some View {

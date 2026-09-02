@@ -23,9 +23,11 @@ final class IslandWindowCoordinator {
     private var observationStarted = false
 
     private var draggingIslandID: UUID?
+    private var isDraggingEmptyWorkspace = false
     private var dragStartGap: CGFloat = 0
     private var dragCurrentGap: CGFloat?
     private var dragStartMouseY: CGFloat = 0
+    private var emptyWorkspacePanel: FloatingPanel?
 
     init(runtime: IslandRuntime) {
         self.runtime = runtime
@@ -67,6 +69,8 @@ final class IslandWindowCoordinator {
         removeClickMonitor()
         removeMoveMonitor()
         detailPanel.orderOut(nil)
+        emptyWorkspacePanel?.orderOut(nil)
+        emptyWorkspacePanel = nil
         for panel in panels.values { panel.orderOut(nil) }
         panels.removeAll()
         hosts.removeAll()
@@ -147,6 +151,7 @@ final class IslandWindowCoordinator {
 
     private func reconcile(animated: Bool) {
         let visible = runtime.workspaceStore.visibleIslands
+        reconcileEmptyWorkspace(visible.isEmpty)
         let visibleIDs = Set(visible.map(\.id))
 
         for id in panels.keys where !visibleIDs.contains(id) {
@@ -202,6 +207,56 @@ final class IslandWindowCoordinator {
         panels[island.id] = panel
         hosts[island.id] = host
         hostMaxHeights[island.id] = maxHeight
+        return panel
+    }
+
+    private func reconcileEmptyWorkspace(_ isEmpty: Bool) {
+        guard isEmpty else {
+            emptyWorkspacePanel?.orderOut(nil)
+            return
+        }
+        let placement = runtime.workspaceStore.workspace.emptyIslandPlacement
+        let screen = screen(for: placement.display)
+        let maxHeight = maximumHeight(for: screen)
+        let height = min(IslandMetrics.height(forProviderCount: 0), maxHeight)
+        let panel = emptyWorkspacePanel ?? makeEmptyWorkspacePanel(edge: placement.edge, height: height)
+        emptyWorkspacePanel = panel
+        if let host = panel.contentView as? ScaleAwareHostingView<EmptyWorkspaceIslandView> {
+            host.rootView = EmptyWorkspaceIslandView(edge: placement.edge)
+        }
+        guard let screen else {
+            panel.orderFrontRegardless()
+            return
+        }
+        let gap = IslandPlacement.clampedTopGap(
+            CGFloat(placement.topGap),
+            islandHeight: height,
+            visibleHeight: screen.visibleFrame.height
+        )
+        if !isDraggingEmptyWorkspace {
+            panel.setFrame(
+                NSRect(
+                    x: originX(for: placement.edge, on: screen),
+                    y: IslandPlacement.originY(
+                        topGap: gap,
+                        islandHeight: height,
+                        visibleMaxY: screen.visibleFrame.maxY
+                    ),
+                    width: IslandMetrics.width,
+                    height: height
+                ),
+                display: true
+            )
+        }
+        if !panel.isVisible { panel.orderFrontRegardless() }
+    }
+
+    private func makeEmptyWorkspacePanel(edge: IslandEdge, height: CGFloat) -> FloatingPanel {
+        let panel = FloatingPanel(size: NSSize(width: IslandMetrics.width, height: height))
+        let host = ScaleAwareHostingView(rootView: EmptyWorkspaceIslandView(edge: edge))
+        host.wantsLayer = true
+        host.layer?.backgroundColor = NSColor.clear.cgColor
+        panel.contentView = host
         return panel
     }
 
@@ -406,16 +461,18 @@ final class IslandWindowCoordinator {
             NSEvent.removeMonitor(moveMonitor)
             self.moveMonitor = nil
         }
-        if draggingIslandID != nil { NSCursor.pop() }
+        if draggingIslandID != nil || isDraggingEmptyWorkspace { NSCursor.pop() }
         draggingIslandID = nil
+        isDraggingEmptyWorkspace = false
         dragCurrentGap = nil
     }
 
     private func handleMoveEvent(_ event: NSEvent) -> Bool {
         switch event.type {
         case .leftMouseDown:
-            guard event.modifierFlags.contains(.command),
-                  let id = panels.first(where: { $0.value.windowNumber == event.windowNumber })?.key,
+            guard event.modifierFlags.contains(.command) else { return false }
+            if beginEmptyWorkspaceDrag(event) { return true }
+            guard let id = panels.first(where: { $0.value.windowNumber == event.windowNumber })?.key,
                   let island = runtime.workspaceStore.island(id: id),
                   let frame = frames[id],
                   let screen = panels[id]?.screen ?? screen(for: island.placement.display)
@@ -429,6 +486,7 @@ final class IslandWindowCoordinator {
             NSCursor.resizeUpDown.push()
             return true
         case .leftMouseDragged:
+            if isDraggingEmptyWorkspace { return moveEmptyWorkspace() }
             guard let id = draggingIslandID,
                   let island = runtime.workspaceStore.island(id: id),
                   let screen = panels[id]?.screen ?? screen(for: island.placement.display),
@@ -451,6 +509,19 @@ final class IslandWindowCoordinator {
             panels[id]?.setFrame(moved, display: true)
             return true
         case .leftMouseUp:
+            if isDraggingEmptyWorkspace {
+                if let gap = dragCurrentGap {
+                    runtime.workspaceStore.updateEmptyIslandPlacement {
+                        $0.mode = .manual
+                        $0.topGap = Double(gap)
+                    }
+                }
+                isDraggingEmptyWorkspace = false
+                dragCurrentGap = nil
+                NSCursor.pop()
+                reconcile(animated: false)
+                return true
+            }
             guard let id = draggingIslandID else { return false }
             if let gap = dragCurrentGap {
                 runtime.workspaceStore.updateIsland(id) {
@@ -466,6 +537,44 @@ final class IslandWindowCoordinator {
         default:
             return false
         }
+    }
+
+    private func beginEmptyWorkspaceDrag(_ event: NSEvent) -> Bool {
+        guard runtime.workspaceStore.visibleIslands.isEmpty,
+              let panel = emptyWorkspacePanel,
+              panel.windowNumber == event.windowNumber,
+              let screen = panel.screen
+                ?? screen(for: runtime.workspaceStore.workspace.emptyIslandPlacement.display)
+        else { return false }
+        isDraggingEmptyWorkspace = true
+        dragStartMouseY = NSEvent.mouseLocation.y
+        dragStartGap = screen.visibleFrame.maxY - panel.frame.maxY
+        dragCurrentGap = dragStartGap
+        NSCursor.resizeUpDown.push()
+        return true
+    }
+
+    private func moveEmptyWorkspace() -> Bool {
+        guard let panel = emptyWorkspacePanel,
+              let screen = panel.screen
+                ?? screen(for: runtime.workspaceStore.workspace.emptyIslandPlacement.display)
+        else { return false }
+        let frame = panel.frame
+        let gap = IslandPlacement.topGap(
+            movingFrom: dragStartGap,
+            mouseDeltaY: NSEvent.mouseLocation.y - dragStartMouseY,
+            islandHeight: frame.height,
+            visibleHeight: screen.visibleFrame.height
+        )
+        dragCurrentGap = gap
+        var moved = frame
+        moved.origin.y = IslandPlacement.originY(
+            topGap: gap,
+            islandHeight: frame.height,
+            visibleMaxY: screen.visibleFrame.maxY
+        )
+        panel.setFrame(moved, display: true)
+        return true
     }
 }
 

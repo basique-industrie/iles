@@ -47,6 +47,9 @@ final class SettingsController {
             self.window = window
         }
         guard let window else { return }
+        if window.isMiniaturized {
+            window.deminiaturize(nil)
+        }
         if !window.isVisible {
             window.center()
         }

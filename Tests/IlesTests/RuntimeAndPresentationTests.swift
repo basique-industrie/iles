@@ -110,6 +110,7 @@ extension IlesSelfTests {
             let workspace = IslandWorkspaceStore(
                 repository: JSONIslandWorkspaceRepository(store: box.store)
             )
+            workspace.addIsland()
             let islandID = workspace.islands[0].id
             _ = workspace.addComplication(
                 to: islandID,
@@ -176,6 +177,7 @@ extension IlesSelfTests {
             let workspace = IslandWorkspaceStore(
                 repository: JSONIslandWorkspaceRepository(store: box.store)
             )
+            workspace.addIsland()
             let islandID = workspace.islands[0].id
             _ = workspace.addComplication(
                 to: islandID,
@@ -321,6 +323,7 @@ extension IlesSelfTests {
             let workspace = IslandWorkspaceStore(
                 repository: JSONIslandWorkspaceRepository(store: box.store)
             )
+            workspace.addIsland()
             let runtime = IslandRuntime.testing(
                 providers: [],
                 workspaceStore: workspace
