@@ -11,9 +11,7 @@ public final class ExtensionRegistry: Sendable {
     private let trustRepository: any ExtensionTrustRepository
 
     public static var defaultDirectory: URL {
-        FileManager.default.homeDirectoryForCurrentUser
-            .appending(path: ".iles")
-            .appending(path: "extensions")
+        AppIdentity.current.extensionsDirectory
     }
 
     public init(

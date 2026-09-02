@@ -12,6 +12,48 @@ extension IlesSelfTests {
         // MARK: Settings store
 
         do {
+            let shipped = AppIdentity.shipped
+            let development = AppIdentity.development
+            test.expectEqual(shipped.bundleIdentifier, "com.jean.iles", "shipped bundle id")
+            test.expectEqual(development.bundleIdentifier, "com.jean.iles.dev", "dev bundle id")
+            test.expect(!shipped.isDevelopment, "shipped identity is not marked development")
+            test.expect(development.isDevelopment, "dev identity is marked development")
+            test.expectEqual(shipped.displayName, "Iles", "shipped display name")
+            test.expectEqual(development.displayName, "Iles Dev", "dev display name")
+            test.expectEqual(shipped.dataDirectoryName, ".iles", "shipped settings directory")
+            test.expectEqual(development.dataDirectoryName, ".iles-dev", "dev settings directory")
+            test.expectEqual(
+                shipped.keychainService,
+                "com.jean.iles.credentials",
+                "shipped Keychain service"
+            )
+            test.expectEqual(
+                development.keychainService,
+                "com.jean.iles.dev.credentials",
+                "dev Keychain service"
+            )
+            test.expectEqual(shipped.hookPortFileName, "iles-hook-port", "shipped hook port file")
+            test.expectEqual(
+                development.hookPortFileName,
+                "iles-dev-hook-port",
+                "dev hook port file"
+            )
+            let shippedHook = HookInstaller.hookCommand(for: shipped)
+            let developmentHook = HookInstaller.hookCommand(for: development)
+            test.expect(shippedHook.contains("__iles_hook()"), "shipped hook function")
+            test.expect(developmentHook.contains("__iles_dev_hook()"), "dev hook function")
+            test.expect(shippedHook.contains("iles-hook-port"), "shipped hook reads its port file")
+            test.expect(
+                developmentHook.contains("iles-dev-hook-port"),
+                "dev hook reads its port file"
+            )
+            test.expect(
+                !shippedHook.contains("iles-dev-hook-port"),
+                "shipped hook does not read the dev port file"
+            )
+        }
+
+        do {
             let shell = Shell.detect(from: "/bin/zsh")
             test.expectEqual(
                 shell.whichArguments(for: "codex"),

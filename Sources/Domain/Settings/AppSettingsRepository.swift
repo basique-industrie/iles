@@ -3,7 +3,8 @@ import Foundation
 /// Repository protocol for all app-level settings (display, sync, budget, etc.).
 /// Provider-specific settings live in `ProviderSettingsRepository` sub-protocols.
 ///
-/// Both protocols share one backing store (`~/.iles/settings.json`).
+/// Both protocols share one backing store (`~/.iles/settings.json`, or
+/// `~/.iles-dev/settings.json` for the development app).
 public protocol AppSettingsRepository: Sendable {
     // MARK: - Background Sync
 

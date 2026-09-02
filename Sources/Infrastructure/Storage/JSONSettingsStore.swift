@@ -77,8 +77,7 @@ public final class JSONSettingsStore: @unchecked Sendable {
     }
 
     public static func defaultFileURL() -> URL {
-        FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".iles/settings.json")
+        AppIdentity.current.settingsFileURL
     }
 
     private func readFile() -> [String: Any] {

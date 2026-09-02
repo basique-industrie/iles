@@ -9,7 +9,7 @@ public final class KeychainCredentialRepository: CredentialRepository, @unchecke
     private let service: String
 
     /// Creates a Keychain credential store with an isolated service name.
-    public init(service: String = "com.jean.iles.credentials") {
+    public init(service: String = AppIdentity.current.keychainService) {
         self.service = service
     }
 

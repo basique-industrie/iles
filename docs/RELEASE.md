@@ -81,5 +81,7 @@ without publishing.
 
 Test the stapled app on a clean macOS user account before publishing.
 
-The ordinary `scripts/package.sh` command makes an ad-hoc-signed local build; it
-is intentionally not suitable for public distribution.
+The ordinary `scripts/package.sh` command makes an ad-hoc-signed **Iles Dev**
+build (`com.jean.iles.dev`). It is intentionally not suitable for public
+distribution and does not replace a notarized `Iles.app`. `scripts/release.sh`
+always packages the shipped identity (`com.jean.iles`).

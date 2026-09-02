@@ -8,7 +8,7 @@ struct IlesApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
-        MenuBarExtra("Iles", systemImage: "circle.hexagonpath.fill") {
+        MenuBarExtra(AppIdentity.current.displayName, systemImage: "circle.hexagonpath.fill") {
             Button("Settings…") {
                 appDelegate.showSettings()
             }
@@ -31,7 +31,7 @@ struct IlesApp: App {
                 AppLog.openLogsDirectory()
             }
             Divider()
-            Button("Quit Iles") {
+            Button("Quit \(AppIdentity.current.displayName)") {
                 NSApp.terminate(nil)
             }
         }

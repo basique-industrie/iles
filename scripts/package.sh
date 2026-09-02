@@ -5,13 +5,43 @@ PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
 cd "$PROJECT_ROOT"
 
 CONFIGURATION="${CONFIGURATION:-release}"
+VARIANT="${ILES_VARIANT:-dev}"
 PRODUCT_NAME="Iles"
-IDENTIFIER="com.jean.iles"
-FINAL_APP="$PROJECT_ROOT/dist/${PRODUCT_NAME}.app"
+
+for arg in "$@"; do
+  case "$arg" in
+    --dev) VARIANT="dev" ;;
+    --shipped) VARIANT="shipped" ;;
+    *)
+      echo "Unknown argument: $arg" >&2
+      echo "Usage: $0 [--dev|--shipped]" >&2
+      exit 1
+      ;;
+  esac
+done
+
+case "$VARIANT" in
+  dev)
+    APP_NAME="Iles Dev"
+    IDENTIFIER="com.jean.iles.dev"
+    EXECUTABLE_NAME="IlesDev"
+    ;;
+  shipped)
+    APP_NAME="Iles"
+    IDENTIFIER="com.jean.iles"
+    EXECUTABLE_NAME="Iles"
+    ;;
+  *)
+    echo "Unknown ILES_VARIANT: $VARIANT (use dev or shipped)" >&2
+    exit 1
+    ;;
+esac
+
+FINAL_APP="$PROJECT_ROOT/dist/${APP_NAME}.app"
 ENTITLEMENTS="$PROJECT_ROOT/Sources/Iles/Iles.entitlements"
 ICON="$PROJECT_ROOT/Sources/Iles/Resources/Iles.icns"
 STAGE_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/Iles-package.XXXXXX")"
-STAGED_APP="$STAGE_ROOT/${PRODUCT_NAME}.app"
+STAGED_APP="$STAGE_ROOT/${APP_NAME}.app"
 
 cleanup() {
   [[ "$STAGE_ROOT" == *"/Iles-package."* ]] && /bin/rm -rf "$STAGE_ROOT"
@@ -21,7 +51,7 @@ trap cleanup EXIT
 if [[ -n "${PREBUILT_BINARY:-}" ]]; then
   BINARY="$PREBUILT_BINARY"
 else
-  echo "Building ${PRODUCT_NAME} (${CONFIGURATION})..."
+  echo "Building ${PRODUCT_NAME} (${CONFIGURATION}, ${VARIANT})..."
   swift build -c "$CONFIGURATION" --product "$PRODUCT_NAME"
   BINARY_DIRECTORY="$(swift build -c "$CONFIGURATION" --show-bin-path)"
   BINARY="$BINARY_DIRECTORY/$PRODUCT_NAME"
@@ -31,8 +61,12 @@ fi
 [[ -f "$ICON" ]] || { echo "Missing application icon: $ICON" >&2; exit 1; }
 
 mkdir -p "$STAGED_APP/Contents/MacOS" "$STAGED_APP/Contents/Resources"
-install -m 0755 "$BINARY" "$STAGED_APP/Contents/MacOS/$PRODUCT_NAME"
+install -m 0755 "$BINARY" "$STAGED_APP/Contents/MacOS/$EXECUTABLE_NAME"
 install -m 0644 Sources/Iles/Info.plist "$STAGED_APP/Contents/Info.plist"
+plutil -replace CFBundleIdentifier -string "$IDENTIFIER" "$STAGED_APP/Contents/Info.plist"
+plutil -replace CFBundleName -string "$APP_NAME" "$STAGED_APP/Contents/Info.plist"
+plutil -replace CFBundleDisplayName -string "$APP_NAME" "$STAGED_APP/Contents/Info.plist"
+plutil -replace CFBundleExecutable -string "$EXECUTABLE_NAME" "$STAGED_APP/Contents/Info.plist"
 install -m 0644 "$ICON" "$STAGED_APP/Contents/Resources/Iles.icns"
 install -m 0644 Sources/Iles/Resources/PrivacyInfo.xcprivacy "$STAGED_APP/Contents/Resources/PrivacyInfo.xcprivacy"
 install -m 0644 LICENSE "$STAGED_APP/Contents/Resources/LICENSE.txt"
@@ -79,4 +113,4 @@ if ! mv "$STAGED_APP" "$FINAL_APP"; then
   exit 1
 fi
 
-echo "Packaged $FINAL_APP"
+echo "Packaged $FINAL_APP ($IDENTIFIER)"

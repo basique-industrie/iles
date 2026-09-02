@@ -56,7 +56,8 @@ lipo "$WORK_ROOT/$PRODUCT_NAME" -verify_arch arm64 x86_64
 
 PREBUILT_BINARY="$WORK_ROOT/$PRODUCT_NAME" \
 SIGNING_IDENTITY="$SIGNING_IDENTITY" \
-./scripts/package.sh
+ILES_VARIANT=shipped \
+./scripts/package.sh --shipped
 
 APP="$PROJECT_ROOT/dist/$PRODUCT_NAME.app"
 ARCHIVE="$PROJECT_ROOT/dist/$PRODUCT_NAME-$VERSION-$BUILD.zip"

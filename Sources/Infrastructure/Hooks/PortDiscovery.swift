@@ -1,15 +1,13 @@
 import Foundation
 
-/// Manages the port discovery file at ~/.claude/iles-hook-port.
+/// Manages the identity-specific Claude hook port and auth files.
 public enum PortDiscovery {
     public static var portFilePath: String {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        return "\(home)/.claude/iles-hook-port"
+        AppIdentity.current.hookPortFileURL.path
     }
 
     public static var authenticationHeaderFilePath: String {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        return "\(home)/.claude/iles-hook-auth"
+        AppIdentity.current.hookAuthFileURL.path
     }
 
     /// Writes the port number to the discovery file.

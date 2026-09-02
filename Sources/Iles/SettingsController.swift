@@ -1,4 +1,5 @@
 import AppKit
+import Infrastructure
 import IslandGeometry
 import SwiftUI
 
@@ -30,7 +31,7 @@ final class SettingsController {
                 backing: .buffered,
                 defer: false
             )
-            window.title = "Iles"
+            window.title = AppIdentity.current.displayName
             window.level = .normal
             window.isOpaque = true
             window.backgroundColor = IslandPalette.popoverNSColor

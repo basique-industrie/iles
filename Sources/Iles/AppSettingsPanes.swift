@@ -102,10 +102,14 @@ struct AboutSettingsPane: View {
             VStack(spacing: 9) {
                 IlesAppMark()
                     .frame(width: 64, height: 64)
-                Text("Iles")
+                Text(AppIdentity.current.displayName)
                     .font(.system(size: 19, weight: .semibold))
                     .foregroundStyle(.white)
-                Text("A complication workspace for your Mac")
+                Text(
+                    AppIdentity.current.isDevelopment
+                        ? "Development build — isolated from the shipped app"
+                        : "A complication workspace for your Mac"
+                )
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(IslandChrome.secondaryText)
                 Text("Version \(version) (\(build))")

@@ -13,9 +13,10 @@ views. It is not sent to the Iles project or its maintainers.
 
 App-managed credentials are stored in macOS Keychain with accessibility limited
 to an unlocked device. Non-secret preferences are stored in
-`~/.iles/settings.json`. Redacted, size-limited diagnostics are stored in
-`~/Library/Logs/Iles/`; support logs leave the Mac only when you export
-and share one yourself.
+`~/.iles/settings.json`. The local **Iles Dev** build uses
+`~/.iles-dev/settings.json` instead. Redacted, size-limited diagnostics are
+stored in `~/Library/Logs/Iles/` or `~/Library/Logs/Iles-Dev/`; support logs
+leave the Mac only when you export and share one yourself.
 
 ## Network requests
 
@@ -42,5 +43,7 @@ detection.
 
 Quit Iles, remove `~/.iles/`, remove
 `~/Library/Logs/Iles/`, and delete entries for the Keychain service
-`com.jean.iles.credentials`. If the Claude Code hook was enabled, disable
-it in Iles first so only the marked hook entry is removed cleanly.
+`com.jean.iles.credentials`. For Iles Dev, use `~/.iles-dev/`,
+`~/Library/Logs/Iles-Dev/`, and `com.jean.iles.dev.credentials`. If the Claude
+Code hook was enabled, disable it in that app first so only its marked hook
+entry is removed cleanly.

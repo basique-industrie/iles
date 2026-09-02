@@ -5,7 +5,7 @@ import OSLog
 ///
 /// This facade provides category-specific loggers that output to:
 /// 1. **OSLog** - For Console.app, live streaming, and development debugging
-/// 2. **File** - For user-accessible logs at ~/Library/Logs/Iles/Iles.log
+/// 2. **File** - For user-accessible logs (`~/Library/Logs/Iles/` or `Iles-Dev/`)
 ///
 /// ## Usage Examples
 ///
@@ -35,11 +35,13 @@ import OSLog
 /// **File logs (for users):**
 /// ```
 /// ~/Library/Logs/Iles/Iles.log
+/// ~/Library/Logs/Iles-Dev/Iles-Dev.log
 /// ```
 ///
 /// **OSLog (for developers):**
 /// ```bash
 /// log show --predicate 'subsystem == "com.jean.iles"' --info --debug --last 1h
+/// log show --predicate 'subsystem == "com.jean.iles.dev"' --info --debug --last 1h
 /// ```
 public enum AppLog {
     /// Logger for quota monitoring operations

@@ -67,7 +67,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private static func activateExistingInstanceIfNeeded() -> Bool {
-        let identifier = Bundle.main.bundleIdentifier ?? "com.jean.iles"
+        let identifier = Bundle.main.bundleIdentifier ?? AppIdentity.shippedBundleIdentifier
         let others = NSRunningApplication.runningApplications(withBundleIdentifier: identifier)
             .filter { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier }
         guard let existing = others.first else { return false }

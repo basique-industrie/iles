@@ -20,24 +20,24 @@ for arg in "$@"; do
   esac
 done
 
-CONFIGURATION="$CONFIGURATION" ./scripts/package.sh
+CONFIGURATION="$CONFIGURATION" ./scripts/package.sh --dev
 
-APP="dist/Iles.app"
-if pgrep -x Iles >/dev/null 2>&1; then
-  killall Iles 2>/dev/null || true
+APP="dist/Iles Dev.app"
+if pgrep -x IlesDev >/dev/null 2>&1; then
+  killall IlesDev 2>/dev/null || true
   for _ in {1..40}; do
-    if ! pgrep -x Iles >/dev/null 2>&1; then
+    if ! pgrep -x IlesDev >/dev/null 2>&1; then
       break
     fi
     sleep 0.05
   done
-  if pgrep -x Iles >/dev/null 2>&1; then
-    echo "Iles did not exit; refusing to reactivate an older build." >&2
+  if pgrep -x IlesDev >/dev/null 2>&1; then
+    echo "Iles Dev did not exit; refusing to reactivate an older build." >&2
     exit 1
   fi
 fi
 
-echo "Launching Iles ($MODE, $CONFIGURATION)..."
+echo "Launching Iles Dev ($MODE, $CONFIGURATION)..."
 ARGS=()
 if [[ "$MODE" == "demo" ]]; then
   ARGS+=("--demo")

@@ -6,7 +6,9 @@ import Darwin
 
 /// Installs and uninstalls Iles hooks in ~/.claude/settings.json.
 public enum HookInstaller {
-    static let hookMarker = "__iles_hook"
+    static var hookMarker: String {
+        AppIdentity.current.hookFunctionName
+    }
 
     /// The settings file path
     public static var settingsPath: String {
@@ -16,9 +18,16 @@ public enum HookInstaller {
 
     /// The hook forwards only the three fields used by Iles. It exits
     /// silently when the app is not running because there is no fixed-port fallback.
-    static let hookCommand = """
-    __iles_hook() { PORT_FILE="$HOME/.claude/iles-hook-port"; AUTH_FILE="$HOME/.claude/iles-hook-auth"; [ -r "$PORT_FILE" ] && [ -r "$AUTH_FILE" ] || { cat >/dev/null; return 0; }; BODY=$(/usr/bin/mktemp -t iles-hook) || { cat >/dev/null; return 0; }; /bin/chmod 600 "$BODY"; /bin/cat >"$BODY"; SID=$(/usr/bin/plutil -extract session_id json -o - "$BODY" 2>/dev/null) || { /bin/rm -f "$BODY"; return 0; }; EVENT=$(/usr/bin/plutil -extract hook_event_name json -o - "$BODY" 2>/dev/null) || { /bin/rm -f "$BODY"; return 0; }; CWD=$(/usr/bin/plutil -extract cwd json -o - "$BODY" 2>/dev/null || /usr/bin/printf '""'); /bin/rm -f "$BODY"; PORT=$(/bin/cat "$PORT_FILE" 2>/dev/null); case "$PORT" in ''|*[!0-9]*) return 0;; esac; /usr/bin/printf '{"session_id":%s,"hook_event_name":%s,"cwd":%s}' "$SID" "$EVENT" "$CWD" | /usr/bin/curl --silent --show-error --max-time 2 --request POST "http://127.0.0.1:${PORT}/hook" --header 'Content-Type: application/json' --header @"$AUTH_FILE" --data-binary @- >/dev/null 2>&1 & }; __iles_hook
-    """
+    static var hookCommand: String {
+        hookCommand(for: .current)
+    }
+
+    static func hookCommand(for identity: AppIdentity) -> String {
+        let marker = identity.hookFunctionName
+        return """
+        \(marker)() { PORT_FILE="$HOME/.claude/\(identity.hookPortFileName)"; AUTH_FILE="$HOME/.claude/\(identity.hookAuthFileName)"; [ -r "$PORT_FILE" ] && [ -r "$AUTH_FILE" ] || { cat >/dev/null; return 0; }; BODY=$(/usr/bin/mktemp -t \(identity.hookTempPrefix)) || { cat >/dev/null; return 0; }; /bin/chmod 600 "$BODY"; /bin/cat >"$BODY"; SID=$(/usr/bin/plutil -extract session_id json -o - "$BODY" 2>/dev/null) || { /bin/rm -f "$BODY"; return 0; }; EVENT=$(/usr/bin/plutil -extract hook_event_name json -o - "$BODY" 2>/dev/null) || { /bin/rm -f "$BODY"; return 0; }; CWD=$(/usr/bin/plutil -extract cwd json -o - "$BODY" 2>/dev/null || /usr/bin/printf '""'); /bin/rm -f "$BODY"; PORT=$(/bin/cat "$PORT_FILE" 2>/dev/null); case "$PORT" in ''|*[!0-9]*) return 0;; esac; /usr/bin/printf '{"session_id":%s,"hook_event_name":%s,"cwd":%s}' "$SID" "$EVENT" "$CWD" | /usr/bin/curl --silent --show-error --max-time 2 --request POST "http://127.0.0.1:${PORT}/hook" --header 'Content-Type: application/json' --header @"$AUTH_FILE" --data-binary @- >/dev/null 2>&1 & }; \(marker)
+        """
+    }
 
     /// The event names to register hooks for
     static let hookEvents = [

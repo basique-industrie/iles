@@ -1,6 +1,7 @@
 # Extension manifest v2
 
-Iles loads local extensions from `~/.iles/extensions/<name>/`.
+Iles loads local extensions from `~/.iles/extensions/<name>/`. Iles Dev uses
+`~/.iles-dev/extensions/<name>/` instead.
 Each extension needs a `manifest.json` and may include relative probe scripts.
 Schema v2 is the only accepted schema; pre-launch manifests are not migrated.
 

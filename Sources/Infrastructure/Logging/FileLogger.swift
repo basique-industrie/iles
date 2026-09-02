@@ -3,7 +3,7 @@ import Foundation
 import AppKit
 #endif
 
-/// File-based logger that writes to ~/Library/Logs/Iles/Iles.log
+/// File-based logger that writes to the identity-specific support log.
 /// Provides user-accessible logs for debugging and support.
 ///
 /// Thread-safety: All file operations are serialized on a dedicated dispatch queue.
@@ -31,14 +31,7 @@ public final class FileLogger: @unchecked Sendable {
     }
 
     private convenience init() {
-        // ~/Library/Logs/Iles/Iles.log
-        let libraryDirectory = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first
-            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library", isDirectory: true)
-        let logsDir = libraryDirectory
-            .appendingPathComponent("Logs", isDirectory: true)
-            .appendingPathComponent("Iles", isDirectory: true)
-
-        self.init(fileURL: logsDir.appendingPathComponent("Iles.log"))
+        self.init(fileURL: AppIdentity.current.logFileURL)
     }
 
     init(fileURL: URL, maxFileSize: UInt64 = 5 * 1024 * 1024) {

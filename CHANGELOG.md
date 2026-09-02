@@ -11,6 +11,9 @@ string with no leading `v`. Tags add the `v`.
 
 - A new install starts with an empty workspace. The edge plus opens Settings,
   or brings the existing Settings window forward if it is already open.
+- Local `scripts/package.sh` and `scripts/run.sh` now produce **Iles Dev**
+  (`com.jean.iles.dev`, `~/.iles-dev/`) so it can run next to the notarized
+  **Iles** app without sharing settings, Keychain items, or Claude hooks.
 
 ### Fixed
 

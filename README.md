@@ -40,7 +40,8 @@ working without notice.
 - macOS 26 or newer
 
 The notarized release is a universal `Iles.app` (`arm64` and `x86_64`). Local
-ad-hoc builds from `scripts/package.sh` follow the machine you build on.
+`scripts/package.sh` and `scripts/run.sh` builds are **Iles Dev**, a separate
+ad-hoc app that can run next to the shipped build.
 
 ## What it does
 
@@ -72,7 +73,9 @@ monitoring.
 3. Open **Iles**. Islands appear on the screen edge; there is no Dock icon.
 
 The first public artifacts are signed and notarized. A local
-`scripts/package.sh` build is ad-hoc signed and is for development only.
+`scripts/package.sh` build is **Iles Dev**: ad-hoc signed, a different bundle
+ID, and isolated settings so it does not replace or share state with
+`/Applications/Iles.app`.
 
 **Settings…** opens the island editor, searchable complication catalog, source
 setup, general settings, and About.
@@ -82,20 +85,22 @@ setup, general settings, and About.
 On a Mac with the macOS 26 SDK and a Swift 6.2 toolchain:
 
 ```bash
-./scripts/package.sh
-cp -R dist/Iles.app /Applications/
-open /Applications/Iles.app
+./scripts/run.sh
 ```
+
+That packages and opens **Iles Dev** (`dist/Iles Dev.app`). Leave the GitHub
+**Iles.app** in Applications if you want both running.
 
 Useful commands:
 
 | Command | Purpose |
 | --- | --- |
-| `./scripts/run.sh` | Live probes |
+| `./scripts/run.sh` | Live probes in Iles Dev |
 | `./scripts/run.sh --demo` | Deterministic demo values |
 | `swift test` | Regression and security suites |
 | `./scripts/check-public-release.sh` | Public-release hygiene |
-| `./scripts/package.sh` | Ad-hoc `dist/Iles.app` |
+| `./scripts/package.sh` | Ad-hoc `dist/Iles Dev.app` |
+| `./scripts/package.sh --shipped` | Ad-hoc `dist/Iles.app` (same identity as a release) |
 | `./scripts/release.sh` | Signed, notarized zip from a matching tag |
 
 ## Catalog
@@ -124,13 +129,13 @@ source. There is intentionally no public extension marketplace.
 
 ## Local data
 
-| Data | Location |
-| --- | --- |
-| Settings | `~/.iles/settings.json` |
-| Extensions | `~/.iles/extensions/` |
-| Redacted logs | `~/Library/Logs/Iles/` |
-| App credentials | Keychain service `com.jean.iles.credentials` |
-| Claude hook | marked entry in `~/.claude/settings.json` |
+| Data | Shipped Iles | Iles Dev |
+| --- | --- | --- |
+| Settings | `~/.iles/settings.json` | `~/.iles-dev/settings.json` |
+| Extensions | `~/.iles/extensions/` | `~/.iles-dev/extensions/` |
+| Redacted logs | `~/Library/Logs/Iles/` | `~/Library/Logs/Iles-Dev/` |
+| App credentials | Keychain `com.jean.iles.credentials` | Keychain `com.jean.iles.dev.credentials` |
+| Claude hook | `__iles_hook` in `~/.claude/settings.json` | `__iles_dev_hook` in the same file |
 
 Network activity is limited to enabled provider and service sources.
 
