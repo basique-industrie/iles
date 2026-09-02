@@ -11,6 +11,11 @@
 # who can land a workflow change on a public repository can read the key.
 #
 # Nothing third-party runs in this job. actions/checkout is GitHub's own.
+#
+# The job runs on the shared Basique Industrie Mini (org runner m1-mac-mini).
+# Signing material goes into an ephemeral keychain that is removed at the end
+# of the run, and the machine keychain search list is restored so other org
+# repos on the same runner are not left pointing at a deleted keychain.
 name: Release
 
 on:
@@ -35,7 +40,7 @@ concurrency:
 
 jobs:
   release:
-    runs-on: macos-26
+    runs-on: [self-hosted, mac-mini]
     permissions:
       contents: write
     environment: release
@@ -61,13 +66,20 @@ jobs:
           keychain_password=$(openssl rand -base64 24)
           keychain=$RUNNER_TEMP/release.keychain-db
 
+          security default-keychain -d user | sed -e 's/^ *"//' -e 's/" *$//' \
+            > "$RUNNER_TEMP/original-default-keychain"
+          security list-keychains -d user | sed -e 's/"//g' \
+            > "$RUNNER_TEMP/original-keychain-list"
+
           security create-keychain -p "$keychain_password" "$keychain"
           security set-keychain-settings -lut 21600 "$keychain"
           security unlock-keychain -p "$keychain_password" "$keychain"
-          security default-keychain -s "$keychain"
-          existing=$(security list-keychains -d user | sed -e 's/"//g' | xargs)
-          # shellcheck disable=SC2086
-          security list-keychains -d user -s "$keychain" $existing
+          security default-keychain -d user -s "$keychain"
+          existing=()
+          while IFS= read -r line; do
+            [[ -n "$line" ]] && existing+=("$line")
+          done < "$RUNNER_TEMP/original-keychain-list"
+          security list-keychains -d user -s "$keychain" "${existing[@]}"
 
           p12=$RUNNER_TEMP/certificate.p12
           printf '%s' "$APPLE_DEVELOPER_ID_APPLICATION_P12" | base64 --decode > "$p12"
@@ -134,5 +146,19 @@ jobs:
       - name: Take the keychain away again
         if: always()
         run: |
+          set -euo pipefail
+          if [[ -f "$RUNNER_TEMP/original-default-keychain" ]]; then
+            security default-keychain -d user -s "$(cat "$RUNNER_TEMP/original-default-keychain")" || true
+          fi
+          if [[ -f "$RUNNER_TEMP/original-keychain-list" ]]; then
+            original=()
+            while IFS= read -r line; do
+              [[ -n "$line" ]] && original+=("$line")
+            done < "$RUNNER_TEMP/original-keychain-list"
+            if (( ${#original[@]} )); then
+              security list-keychains -d user -s "${original[@]}" || true
+            fi
+          fi
           security delete-keychain "${RELEASE_KEYCHAIN:-}" 2>/dev/null || true
-          rm -f "$RUNNER_TEMP/certificate.p12" "$RUNNER_TEMP/notary.p8"
+          rm -f "$RUNNER_TEMP/certificate.p12" "$RUNNER_TEMP/notary.p8" \
+            "$RUNNER_TEMP/original-default-keychain" "$RUNNER_TEMP/original-keychain-list"

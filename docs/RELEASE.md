@@ -75,9 +75,10 @@ profile, builds a universal hardened-runtime app, notarizes it, staples the
 ticket, and writes a SHA-256 checksum. Override with `ILES_SIGN_IDENTITY` or
 `NOTARY_PROFILE` if more than one identity is installed.
 
-Pushing tag `v0.1.0-beta.2` runs the same script on GitHub Actions after the
+Pushing tag `v0.1.0-beta.2` runs the same script on the shared Basique
+Industrie Mini (`m1-mac-mini`, labels `self-hosted` and `mac-mini`) after the
 `release` environment is approved. `workflow_dispatch` with `dry_run` notarizes
-without publishing.
+without publishing. CI uses the same runner.
 
 Test the stapled app on a clean macOS user account before publishing.
 
