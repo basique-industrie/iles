@@ -1,0 +1,138 @@
+# Publish a signed, notarized app zip for a tag.
+#
+# This runs the same scripts/release.sh that runs locally. The workflow only
+# builds the environment that script already expects — a keychain holding a
+# Developer ID identity and a notarytool credential profile — then gets out of
+# the way.
+#
+# The identity it signs with is not this project's alone: a Developer ID
+# certificate signs everything its owner ships. environment: release keeps the
+# secrets unreachable until somebody approves the run. Without that gate, anyone
+# who can land a workflow change on a public repository can read the key.
+#
+# Nothing third-party runs in this job. actions/checkout is GitHub's own.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The existing tag to build (blank for the current ref)
+        required: false
+      dry_run:
+        description: Build and notarize, but publish nothing
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-26
+    permissions:
+      contents: write
+    environment: release
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Unlock a keychain for this run
+        env:
+          APPLE_DEVELOPER_ID_APPLICATION_P12: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION_P12 }}
+          APPLE_DEVELOPER_ID_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_PASSWORD }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_KEY_ISSUER: ${{ secrets.APPLE_NOTARY_KEY_ISSUER }}
+          APPLE_NOTARY_KEY_P8: ${{ secrets.APPLE_NOTARY_KEY_P8 }}
+        run: |
+          set -euo pipefail
+
+          keychain_password=$(openssl rand -base64 24)
+          keychain=$RUNNER_TEMP/release.keychain-db
+
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security default-keychain -s "$keychain"
+          existing=$(security list-keychains -d user | sed -e 's/"//g' | xargs)
+          # shellcheck disable=SC2086
+          security list-keychains -d user -s "$keychain" $existing
+
+          p12=$RUNNER_TEMP/certificate.p12
+          printf '%s' "$APPLE_DEVELOPER_ID_APPLICATION_P12" | base64 --decode > "$p12"
+          security import "$p12" -k "$keychain" \
+            -P "$APPLE_DEVELOPER_ID_PASSWORD" -T /usr/bin/codesign -f pkcs12
+          rm -f "$p12"
+
+          for ca in packaging/certs/*.cer; do
+            if ! out=$(security import "$ca" -k "$keychain" -t cert 2>&1); then
+              case $out in
+                *"already exists"*) echo "${ca##*/}: already in the keychain" ;;
+                *) echo "$out" >&2; exit 1 ;;
+              esac
+            fi
+          done
+
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$keychain_password" "$keychain" > /dev/null
+
+          security find-identity "$keychain" || true
+          security find-identity -v -p codesigning "$keychain" || true
+
+          p8=$RUNNER_TEMP/notary.p8
+          printf '%s' "$APPLE_NOTARY_KEY_P8" | base64 --decode > "$p8"
+          xcrun notarytool store-credentials iles \
+            --key "$p8" \
+            --key-id "$APPLE_NOTARY_KEY_ID" \
+            --issuer "$APPLE_NOTARY_KEY_ISSUER" \
+            --keychain "$keychain"
+          rm -f "$p8"
+
+          echo "RELEASE_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+
+      - name: Build, sign, notarize and package
+        env:
+          ILES_SKIP_TAG_CHECK: ${{ inputs.dry_run && inputs.tag == '' && '1' || '' }}
+        run: ./scripts/release.sh
+
+      - name: Publish
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/publish.sh "${{ inputs.tag || github.ref_name }}"
+
+      - name: What a real run would have published
+        if: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Sources/Iles/Info.plist)"
+          build="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' Sources/Iles/Info.plist)"
+          archive="dist/Iles-$version-$build.zip"
+          {
+            echo "### Dry run — nothing was published"
+            echo
+            echo "A real run would have created release \`v$version\` from"
+            echo "\`$archive\` ($(du -h "$archive" | cut -f1))."
+            echo
+            echo '```'
+            xcrun stapler validate "dist/Iles.app" 2>&1
+            spctl --assess --type execute --verbose=2 "dist/Iles.app" 2>&1 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Take the keychain away again
+        if: always()
+        run: |
+          security delete-keychain "${RELEASE_KEYCHAIN:-}" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/certificate.p12" "$RUNNER_TEMP/notary.p8"
