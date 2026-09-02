@@ -13,6 +13,8 @@ required_files=(
   THIRD_PARTY_NOTICES.md
   Sources/Iles/Resources/PrivacyInfo.xcprivacy
   Sources/Iles/Resources/Iles.icns
+  packaging/certs/AppleDeveloperIDCA.cer
+  packaging/certs/AppleDeveloperIDG2CA.cer
 )
 
 for required_file in "${required_files[@]}"; do

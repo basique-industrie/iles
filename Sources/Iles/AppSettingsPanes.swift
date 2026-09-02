@@ -146,7 +146,7 @@ struct AboutSettingsPane: View {
     }
 
     private func openProjectPage(_ path: String) {
-        let base = "https://github.com/jean-humann/Iles/"
+        let base = "https://github.com/basique-industrie/iles/"
         guard let url = URL(string: base + path) else { return }
         NSWorkspace.shared.open(url)
     }
