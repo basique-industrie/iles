@@ -37,3 +37,10 @@ All provider assets are rendered in monochrome for small complication surfaces.
 `IlesAppIcon.png` was generated for this project with OpenAI image
 generation from an original brief based on Iles’ three-ring in-app
 mark, then packaged as `Iles.icns`. It contains no third-party logo.
+`docs/assets/app-icon.png` is a 512px export of that same mark for the
+README.
+
+`docs/assets/island-desktop.png` is a screenshot of Iles running on the
+author's Mac. The tropical wallpaper behind the islands is desktop
+background, not Iles artwork, and is not licensed for reuse apart from
+this illustration.

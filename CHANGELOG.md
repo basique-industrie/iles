@@ -7,6 +7,10 @@ string with no leading `v`. Tags add the `v`.
 
 ## Unreleased
 
+### Changed
+
+- Visual README with the application icon and a desktop-island screenshot.
+
 ## 0.1.0-beta.1 - 2026-09-02
 
 ### Added
