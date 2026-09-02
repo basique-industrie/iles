@@ -1,0 +1,23 @@
+#!/bin/sh
+# Print the code-signing identity to use, or nothing if there is none.
+#
+# Discovered rather than hardcoded: the common name embeds a developer account,
+# and these files are committed. ILES_SIGN_IDENTITY overrides the search.
+set -e
+
+if [ -n "$ILES_SIGN_IDENTITY" ]; then
+  echo "$ILES_SIGN_IDENTITY"
+  exit 0
+fi
+
+identities=$(security find-identity -v -p codesigning 2>/dev/null || true)
+
+for prefix in "Developer ID Application:" "Apple Development:"; do
+  identity=$(echo "$identities" | sed -n "s/.*\"\($prefix.*\)\"/\1/p" | head -1)
+  if [ -n "$identity" ]; then
+    echo "$identity"
+    exit 0
+  fi
+done
+
+echo "$identities" | sed -n 's/.*"\(.*\)"/\1/p' | head -1

@@ -4,16 +4,31 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
 cd "$PROJECT_ROOT"
 
-: "${SIGNING_IDENTITY:?Set SIGNING_IDENTITY to a Developer ID Application identity}"
-: "${NOTARY_PROFILE:?Set NOTARY_PROFILE to an xcrun notarytool keychain profile}"
+NOTARY_PROFILE="${NOTARY_PROFILE:-iles}"
+if [[ -z "${SIGNING_IDENTITY:-}" ]]; then
+  SIGNING_IDENTITY="$("$PROJECT_ROOT/scripts/sign-identity")"
+fi
+case "$SIGNING_IDENTITY" in
+  "Developer ID Application:"*) ;;
+  *)
+    echo "Need a Developer ID Application identity (found: ${SIGNING_IDENTITY:-none})." >&2
+    exit 1
+    ;;
+esac
 
 PRODUCT_NAME="Iles"
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Sources/Iles/Info.plist)"
 BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' Sources/Iles/Info.plist)"
 EXPECTED_TAG="v$VERSION"
-CURRENT_TAG="$(git describe --tags --exact-match 2>/dev/null || true)"
-[[ "$CURRENT_TAG" == "$EXPECTED_TAG" ]] || {
-  echo "Release from tag $EXPECTED_TAG (current tag: ${CURRENT_TAG:-none})." >&2
+if [[ "${ILES_SKIP_TAG_CHECK:-}" != "1" ]]; then
+  CURRENT_TAG="$(git describe --tags --exact-match 2>/dev/null || true)"
+  [[ "$CURRENT_TAG" == "$EXPECTED_TAG" ]] || {
+    echo "Release from tag $EXPECTED_TAG (current tag: ${CURRENT_TAG:-none})." >&2
+    exit 1
+  }
+fi
+[[ -z "$(git status --porcelain 2>/dev/null)" ]] || {
+  echo "The working tree has uncommitted changes; commit or stash them first." >&2
   exit 1
 }
 WORK_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/Iles-release.XXXXXX")"

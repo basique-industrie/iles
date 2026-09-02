@@ -5,7 +5,8 @@ Build compact edge islands from AI usage, coding activity, time and calendar,
 Mac health, focus, repositories, shipping status, service health, and trusted
 local extensions.
 
-Requires **macOS 26 or newer**.
+Requires **macOS 26 or newer**. Source and releases:
+<https://github.com/basique-industrie/iles>.
 
 ## Status
 
