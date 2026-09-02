@@ -22,6 +22,53 @@ for required_file in "${required_files[@]}"; do
 done
 
 plutil -lint Sources/Iles/Info.plist Sources/Iles/Resources/PrivacyInfo.xcprivacy >/dev/null
+
+# Same published shapes as jean-humann/gwnative: X.Y.Z or X.Y.Z-(alpha|beta|rc).N.
+# Tags add the v; CFBundleShortVersionString and the About line do not.
+version_identifier() {
+  [[ -n "$1" && "$1" == [0-9]* && "$1" != *[^0-9]* && "$1" != 0?* ]]
+}
+published_version() {
+  local version=$1 core rest channel sequence major minor patch extra
+  [[ -n "$version" && "$version" != v* ]] || return 1
+  if [[ "$version" == *-* ]]; then
+    core=${version%%-*}
+    rest=${version#*-}
+    [[ "$rest" == *.* && "$rest" != *.*.* ]] || return 1
+    channel=${rest%%.*}
+    sequence=${rest#*.}
+    case "$channel" in
+      alpha|beta|rc) ;;
+      *) return 1 ;;
+    esac
+    version_identifier "$sequence" || return 1
+  else
+    core=$version
+  fi
+  IFS=. read -r major minor patch extra <<< "$core"
+  [[ -n "$major" && -n "$minor" && -n "$patch" && -z "${extra:-}" ]] || return 1
+  version_identifier "$major" && version_identifier "$minor" && version_identifier "$patch"
+}
+
+VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Sources/Iles/Info.plist)"
+BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' Sources/Iles/Info.plist)"
+published_version "$VERSION" || {
+  echo "CFBundleShortVersionString must be X.Y.Z or X.Y.Z-(alpha|beta|rc).N (found: $VERSION)." >&2
+  exit 1
+}
+[[ "$BUILD" == [1-9]* && "$BUILD" != *[^0-9]* ]] || {
+  echo "CFBundleVersion must be a positive integer (found: $BUILD)." >&2
+  exit 1
+}
+grep -qE "^## ${VERSION} - [0-9]{4}-[0-9]{2}-[0-9]{2}\$" CHANGELOG.md || {
+  echo "CHANGELOG.md needs a dated section for $VERSION." >&2
+  exit 1
+}
+grep -q 'NSPrivacyAccessedAPICategoryFileTimestamp' Sources/Iles/Resources/PrivacyInfo.xcprivacy || {
+  echo "PrivacyInfo.xcprivacy must declare File Timestamp access." >&2
+  exit 1
+}
+
 git diff --check
 
 if git grep --untracked -I -n -E -e \

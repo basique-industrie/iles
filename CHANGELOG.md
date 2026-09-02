@@ -1,9 +1,13 @@
 # Changelog
 
-Notable user-facing changes are documented here. This project follows Semantic
-Versioning once public releases begin.
+Notable user-facing changes are documented here. Versions follow Semantic
+Versioning in the same published shapes as `jean-humann/gwnative`: `X.Y.Z` or
+`X.Y.Z-(alpha|beta|rc).N`. The About pane and GitHub release title show that
+string with no leading `v`. Tags add the `v`.
 
 ## Unreleased
+
+## 0.1.0-beta.1 - 2026-09-02
 
 ### Added
 

@@ -10,7 +10,7 @@ Requires **macOS 26 or newer**. Source and releases:
 
 ## Status
 
-The project is preparing its first public release. Provider integrations are
+The current public line is `0.1.0-beta.1`. Provider integrations are
 community-maintained and are not affiliated with their respective vendors.
 Some AI usage sources read an installed vendor CLI's local state or use an
 undocumented endpoint; those sources can change or stop working without notice.

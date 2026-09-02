@@ -93,8 +93,8 @@ struct GeneralSettingsPane: View {
 }
 
 struct AboutSettingsPane: View {
-    private var version: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0" }
-    private var build: String { Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "11" }
+    private var version: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0-beta.1" }
+    private var build: String { Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "12" }
     private var copyright: String { Bundle.main.infoDictionary?["NSHumanReadableCopyright"] as? String ?? "Copyright © 2026" }
 
     var body: some View {

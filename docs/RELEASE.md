@@ -1,5 +1,22 @@
 # Release process
 
+Versions follow Semantic Versioning in the same published shapes as
+`jean-humann/gwnative`:
+
+| Form | Example | Where it appears |
+| --- | --- | --- |
+| Package version | `0.1.0-beta.1` | `CFBundleShortVersionString`, About (`Version 0.1.0-beta.1 (12)`), GitHub release title |
+| Git tag | `v0.1.0-beta.1` | `git tag`, workflow trigger |
+| Build | `12` | `CFBundleVersion`, zip name, About parentheses |
+
+Allowed package versions are `X.Y.Z` or `X.Y.Z-(alpha|beta|rc).N`. No leading
+zeros, no `+` build metadata, no other prerelease words. Tags add the `v`; the
+string a person reads never has one. `CFBundleVersion` is a positive integer and
+only ever increases for `com.jean.iles`.
+
+A version with a channel suffix is a prerelease. `scripts/publish.sh` marks the
+GitHub release as such.
+
 ## One-time setup
 
 1. Install the macOS 26 SDK and a Swift 6.2 toolchain.
@@ -20,17 +37,19 @@
    - `APPLE_NOTARY_KEY_ISSUER`
    - `APPLE_NOTARY_KEY_P8`
 
-   GitHub never returns secret values. Copy them once from the gwnative
-   `release` environment into `basique-industrie/iles` → Environments →
-   `release`. The names must match exactly.
+   GitHub never returns secret values through `gh`. Export the five values
+   locally (the same ones already stored on the gwnative `release` environment),
+   then run `./scripts/set-release-secrets.sh`. Do not copy `SPARKLE_PRIVATE_KEY`;
+   Iles does not ship Sparkle.
 
 4. Rewrite any private `.local` author email addresses before the repository's
    first public push. Do not rewrite shared public history afterward.
 
 ## Prepare
 
-1. Move entries from `CHANGELOG.md`'s Unreleased section into the release
-   version and date.
+1. Move entries from `CHANGELOG.md`'s Unreleased section into a dated heading
+   that matches `CFBundleShortVersionString` (for example
+   `## 0.1.0-beta.1 - 2026-09-02`).
 2. Keep `CFBundleShortVersionString`, `CFBundleVersion`, and the Git tag aligned.
 3. Review every provider endpoint and brand asset against current vendor terms.
 4. Run:
@@ -42,8 +61,8 @@
    ```
 
 5. Commit the release, then create and check out the annotated tag matching the
-   app version (for example `v1.0.0`). The release script refuses an untagged or
-   mismatched commit.
+   app version (for example `v0.1.0-beta.1`). The release script refuses an
+   untagged or mismatched commit.
 
 ## Build, sign, and notarize
 
@@ -56,9 +75,9 @@ profile, builds a universal hardened-runtime app, notarizes it, staples the
 ticket, and writes a SHA-256 checksum. Override with `ILES_SIGN_IDENTITY` or
 `NOTARY_PROFILE` if more than one identity is installed.
 
-Pushing tag `v1.0.0` runs the same script on GitHub Actions after the `release`
-environment is approved. `workflow_dispatch` with `dry_run` notarizes without
-publishing.
+Pushing tag `v0.1.0-beta.1` runs the same script on GitHub Actions after the
+`release` environment is approved. `workflow_dispatch` with `dry_run` notarizes
+without publishing.
 
 Test the stapled app on a clean macOS user account before publishing.
 

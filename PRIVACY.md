@@ -34,6 +34,10 @@ Calendar and Reminders permission is requested only from the corresponding
 source setup view. Launch at Login is opt-in. Local script extensions are never
 run until their exact content fingerprint has been reviewed and trusted.
 
+The bundled privacy manifest declares Disk Space, System Boot Time, and File
+Timestamp required-reason APIs used for storage, uptime, and local file-change
+detection.
+
 ## Removing local data
 
 Quit Iles, remove `~/.iles/`, remove

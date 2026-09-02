@@ -11,6 +11,10 @@ BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' Sources/Iles/Info.p
 ARCHIVE="$PROJECT_ROOT/dist/Iles-$VERSION-$BUILD.zip"
 CHECKSUM="$ARCHIVE.sha256"
 
+[[ "$TAG" == "v$VERSION" ]] || {
+  echo "Tag $TAG does not match CFBundleShortVersionString $VERSION." >&2
+  exit 1
+}
 [[ -f "$ARCHIVE" && -f "$CHECKSUM" ]] || {
   echo "Missing $ARCHIVE or $CHECKSUM. Run scripts/release.sh first." >&2
   exit 1
@@ -23,8 +27,10 @@ NOTES="$(awk '
 ' CHANGELOG.md)"
 [[ -n "$NOTES" ]] || NOTES="Iles $VERSION."
 
-gh release create "$TAG" \
-  --title "Iles $VERSION" \
-  --notes "$NOTES" \
-  "$ARCHIVE" \
-  "$CHECKSUM"
+create_flags=(--title "Iles $VERSION" --notes "$NOTES")
+# A dash is a prerelease channel (alpha/beta/rc). Do not mark it latest.
+if [[ "$VERSION" == *-* ]]; then
+  create_flags+=(--prerelease)
+fi
+
+gh release create "$TAG" "${create_flags[@]}" "$ARCHIVE" "$CHECKSUM"
