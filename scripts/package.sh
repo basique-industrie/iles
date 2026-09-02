@@ -39,6 +39,8 @@ install -m 0644 LICENSE "$STAGED_APP/Contents/Resources/LICENSE.txt"
 install -m 0644 THIRD_PARTY_NOTICES.md "$STAGED_APP/Contents/Resources/THIRD_PARTY_NOTICES.md"
 printf 'APPL????' > "$STAGED_APP/Contents/PkgInfo"
 
+# SPM's generated Bundle.module looks next to the .app, which codesign rejects
+# as unsealed bundle-root contents. IlesResourceBundle reads this copy instead.
 BUNDLED_RESOURCES="$STAGED_APP/Contents/Resources/Iles_IlesCore.bundle"
 mkdir -p "$BUNDLED_RESOURCES"
 for resource in Sources/Iles/Resources/*; do
@@ -52,6 +54,10 @@ for license in Sources/Iles/Resources/Licenses/*; do
   [[ -f "$license" ]] || continue
   install -m 0644 "$license" "$BUNDLED_RESOURCES/${license:t}"
 done
+[[ -f "$BUNDLED_RESOURCES/ClaudeIcon.svg" ]] || {
+  echo "Missing packaged resource bundle at $BUNDLED_RESOURCES" >&2
+  exit 1
+}
 
 SIGNATURE="${SIGNING_IDENTITY:--}"
 SIGN_ARGUMENTS=(--force --sign "$SIGNATURE" --entitlements "$ENTITLEMENTS" --identifier "$IDENTIFIER")

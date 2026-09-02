@@ -72,7 +72,10 @@ xcrun stapler validate "$APP"
 spctl --assess --type execute --verbose=2 "$APP"
 ditto -c -k --sequesterRsrc --keepParent "$APP" "$FINAL_ARCHIVE"
 mv -f "$FINAL_ARCHIVE" "$ARCHIVE"
-shasum -a 256 "$ARCHIVE" > "$CHECKSUM"
+(
+  cd "$(dirname "$ARCHIVE")"
+  shasum -a 256 "$(basename "$ARCHIVE")" > "$(basename "$CHECKSUM")"
+)
 
 echo "Release artifact: $ARCHIVE"
 echo "Checksum: $CHECKSUM"

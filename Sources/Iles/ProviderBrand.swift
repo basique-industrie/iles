@@ -283,6 +283,24 @@ final class VectorMarkContainerView: NSView {
     }
 }
 
+/// SPM's generated `Bundle.module` looks for `Iles_IlesCore.bundle` next to
+/// the `.app`. Development `swift run` finds it beside the executable. A
+/// packaged app also keeps a copy under `Contents/Resources`.
+enum IlesResourceBundle {
+    static let bundle: Bundle = {
+        let candidates = [
+            Bundle.main.bundleURL.appendingPathComponent("Iles_IlesCore.bundle"),
+            Bundle.main.resourceURL?.appendingPathComponent("Iles_IlesCore.bundle"),
+        ].compactMap { $0 }
+        for url in candidates where FileManager.default.fileExists(atPath: url.path) {
+            if let bundle = Bundle(url: url) {
+                return bundle
+            }
+        }
+        return .module
+    }()
+}
+
 @MainActor
 private enum VectorMarkCache {
     private static var images: [String: NSImage] = [:]
@@ -290,7 +308,7 @@ private enum VectorMarkCache {
     static func image(named name: String, extension ext: String) -> NSImage? {
         let key = "\(name).\(ext)"
         if let image = images[key] { return image }
-        guard let url = Bundle.module.url(forResource: name, withExtension: ext),
+        guard let url = IlesResourceBundle.bundle.url(forResource: name, withExtension: ext),
               let image = NSImage(contentsOf: url)
         else { return nil }
         image.isTemplate = true

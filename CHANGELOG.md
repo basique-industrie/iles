@@ -7,9 +7,13 @@ string with no leading `v`. Tags add the `v`.
 
 ## Unreleased
 
-### Changed
+## 0.1.0-beta.2 - 2026-09-03
 
-- Visual README with the application icon and a desktop-island screenshot.
+### Fixed
+
+- Packaged builds no longer crash on launch when loading provider marks.
+  SPM's `Bundle.module` looks next to the `.app`, so the packaged resource
+  bundle is now resolved from `Contents/Resources`.
 
 ## 0.1.0-beta.1 - 2026-09-02
 

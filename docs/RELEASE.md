@@ -5,9 +5,9 @@ Versions follow Semantic Versioning in the same published shapes as
 
 | Form | Example | Where it appears |
 | --- | --- | --- |
-| Package version | `0.1.0-beta.1` | `CFBundleShortVersionString`, About (`Version 0.1.0-beta.1 (12)`), GitHub release title |
-| Git tag | `v0.1.0-beta.1` | `git tag`, workflow trigger |
-| Build | `12` | `CFBundleVersion`, zip name, About parentheses |
+| Package version | `0.1.0-beta.2` | `CFBundleShortVersionString`, About (`Version 0.1.0-beta.2 (13)`), GitHub release title |
+| Git tag | `v0.1.0-beta.2` | `git tag`, workflow trigger |
+| Build | `13` | `CFBundleVersion`, zip name, About parentheses |
 
 Allowed package versions are `X.Y.Z` or `X.Y.Z-(alpha|beta|rc).N`. No leading
 zeros, no `+` build metadata, no other prerelease words. Tags add the `v`; the
@@ -49,7 +49,7 @@ GitHub release as such.
 
 1. Move entries from `CHANGELOG.md`'s Unreleased section into a dated heading
    that matches `CFBundleShortVersionString` (for example
-   `## 0.1.0-beta.1 - 2026-09-02`).
+   `## 0.1.0-beta.2 - 2026-09-03`).
 2. Keep `CFBundleShortVersionString`, `CFBundleVersion`, and the Git tag aligned.
 3. Review every provider endpoint and brand asset against current vendor terms.
 4. Run:
@@ -61,7 +61,7 @@ GitHub release as such.
    ```
 
 5. Commit the release, then create and check out the annotated tag matching the
-   app version (for example `v0.1.0-beta.1`). The release script refuses an
+   app version (for example `v0.1.0-beta.2`). The release script refuses an
    untagged or mismatched commit.
 
 ## Build, sign, and notarize
@@ -75,7 +75,7 @@ profile, builds a universal hardened-runtime app, notarizes it, staples the
 ticket, and writes a SHA-256 checksum. Override with `ILES_SIGN_IDENTITY` or
 `NOTARY_PROFILE` if more than one identity is installed.
 
-Pushing tag `v0.1.0-beta.1` runs the same script on GitHub Actions after the
+Pushing tag `v0.1.0-beta.2` runs the same script on GitHub Actions after the
 `release` environment is approved. `workflow_dispatch` with `dry_run` notarizes
 without publishing.
 

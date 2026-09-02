@@ -24,7 +24,7 @@ calendar, Mac health, focus, repositories, shipping status, service health, and
 trusted local extensions. It has no Dock icon: the islands sit on the screen
 edge, and **Settings…** opens the editor.
 
-The current public line is `0.1.0-beta.1`.
+The current public line is `0.1.0-beta.2`.
 
 <p align="center">
   <img src="docs/assets/island-desktop.png" width="420" alt="Iles islands on the desktop edge with a Mac Health complication">
