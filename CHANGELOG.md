@@ -14,6 +14,8 @@ string with no leading `v`. Tags add the `v`.
 - Local `scripts/package.sh` and `scripts/run.sh` now produce **Iles Dev**
   (`com.jean.iles.dev`, `~/.iles-dev/`) so it can run next to the notarized
   **Iles** app without sharing settings, Keychain items, or Claude hooks.
+- The Iles Dev menu extra uses an orange mark so it is distinct from shipped
+  Iles.
 
 ### Fixed
 

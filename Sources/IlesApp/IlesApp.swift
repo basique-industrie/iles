@@ -8,7 +8,7 @@ struct IlesApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
-        MenuBarExtra(AppIdentity.current.displayName, systemImage: "circle.hexagonpath.fill") {
+        MenuBarExtra {
             Button("Settings…") {
                 appDelegate.showSettings()
             }
@@ -34,6 +34,12 @@ struct IlesApp: App {
             Button("Quit \(AppIdentity.current.displayName)") {
                 NSApp.terminate(nil)
             }
+        } label: {
+            Image(systemName: MenuBarIdentityIcon.symbolName)
+                .renderingMode(AppIdentity.current.isDevelopment ? .original : .template)
+                .symbolRenderingMode(.monochrome)
+                .foregroundStyle(AppIdentity.current.isDevelopment ? Color(nsColor: .systemOrange) : Color.primary)
+                .accessibilityLabel(AppIdentity.current.displayName)
         }
     }
 }
