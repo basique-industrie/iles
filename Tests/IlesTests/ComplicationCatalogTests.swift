@@ -202,7 +202,11 @@ extension IlesSelfTests {
             )
             let descriptors = catalog.descriptors.filter { $0.kind != .extensionSource }
             let recipes = descriptors.flatMap(\.complications)
-            test.expect(recipes.count >= 80, "focused launch catalog retains broad first-party coverage (found \(recipes.count))")
+            test.expectEqual(
+                recipes.count,
+                88,
+                "first-party launch catalog recipe count (update README when this changes)"
+            )
             let scopedRecipeIDs = descriptors.flatMap { descriptor in
                 descriptor.complications.map { "\(descriptor.id)::\($0.id)" }
             }

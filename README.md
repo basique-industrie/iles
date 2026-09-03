@@ -42,7 +42,7 @@ ad-hoc, a different bundle ID, and isolated settings so it can run next to
 - Nine families: ring, dual ring, value, status, activity, countdown, trend,
   summary, and trio ring
 - Per-element data, used or remaining, tint, label, and click action
-- More than 135 recipes; a recipe appears only when its source has the metrics
+- 88 first-party recipes; a recipe appears only when its source has the metrics
 - Local extensions trusted by content fingerprint — no marketplace, no
   automatic update
 

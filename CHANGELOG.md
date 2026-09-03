@@ -30,6 +30,7 @@ string with no leading `v`. Tags add the `v`.
   linked version is the `exact:` pin in `Package.swift`.
 - Docs and the pull-request template run `./scripts/test.sh`. `swift test`
   does not see the custom suite.
+- The README recipe count matches the first-party launch catalog.
 
 ### Removed
 
