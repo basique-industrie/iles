@@ -68,6 +68,14 @@ public final class JSONSettingsRepository:
         store.write(value: amount, key: "app.claudeApiBudget")
     }
 
+    public func emptyWorkspaceHintDismissed() -> Bool {
+        store.read(key: "app.emptyWorkspaceHintDismissed") ?? false
+    }
+
+    public func setEmptyWorkspaceHintDismissed(_ dismissed: Bool) {
+        store.write(value: dismissed, key: "app.emptyWorkspaceHintDismissed")
+    }
+
     // MARK: - ClaudeSettingsRepository
 
     public func claudeProbeMode() -> ClaudeProbeMode {

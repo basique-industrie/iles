@@ -101,6 +101,7 @@ struct EmptyWorkspaceIslandView: View {
     var body: some View {
         let mirrored = edge == .leading
         IslandPlusAffordance {
+            EmptyWorkspaceHint.dismiss()
             NotificationCenter.default.post(name: .showIslandSettings, object: nil)
         }
         .padding(.horizontal, IslandMetrics.leadingInset)
@@ -111,6 +112,7 @@ struct EmptyWorkspaceIslandView: View {
         }
         .contentShape(IslandShape(mirrored: mirrored))
         .accessibilityLabel("Add an island")
+        .accessibilityHint("Opens Settings to add an island")
         .accessibilityAddTraits(.isButton)
     }
 }

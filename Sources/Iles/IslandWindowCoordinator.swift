@@ -28,6 +28,8 @@ final class IslandWindowCoordinator {
     private var dragCurrentGap: CGFloat?
     private var dragStartMouseY: CGFloat = 0
     private var emptyWorkspacePanel: FloatingPanel?
+    private var emptyHintPanel: FloatingPanel?
+    private var hintObserver: NSObjectProtocol?
 
     init(runtime: IslandRuntime) {
         self.runtime = runtime
@@ -47,6 +49,15 @@ final class IslandWindowCoordinator {
         }
         runtime.islandTopGapPreviewHandler = { [weak self] islandID, value in
             self?.previewTopGap(for: islandID, value: value)
+        }
+        hintObserver = NotificationCenter.default.addObserver(
+            forName: .emptyWorkspaceHintDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.reconcileEmptyWorkspace(self?.runtime.workspaceStore.visibleIslands.isEmpty == true)
+            }
         }
         startObservation()
         installMoveMonitor()
@@ -69,6 +80,12 @@ final class IslandWindowCoordinator {
         removeClickMonitor()
         removeMoveMonitor()
         detailPanel.orderOut(nil)
+        if let hintObserver {
+            NotificationCenter.default.removeObserver(hintObserver)
+            self.hintObserver = nil
+        }
+        emptyHintPanel?.orderOut(nil)
+        emptyHintPanel = nil
         emptyWorkspacePanel?.orderOut(nil)
         emptyWorkspacePanel = nil
         for panel in panels.values { panel.orderOut(nil) }
@@ -212,6 +229,8 @@ final class IslandWindowCoordinator {
 
     private func reconcileEmptyWorkspace(_ isEmpty: Bool) {
         guard isEmpty else {
+            EmptyWorkspaceHint.dismiss()
+            emptyHintPanel?.orderOut(nil)
             emptyWorkspacePanel?.orderOut(nil)
             return
         }
@@ -226,6 +245,7 @@ final class IslandWindowCoordinator {
         }
         guard let screen else {
             panel.orderFrontRegardless()
+            reconcileEmptyHint(relativeTo: panel.frame, edge: placement.edge)
             return
         }
         let gap = IslandPlacement.clampedTopGap(
@@ -249,6 +269,39 @@ final class IslandWindowCoordinator {
             )
         }
         if !panel.isVisible { panel.orderFrontRegardless() }
+        reconcileEmptyHint(relativeTo: panel.frame, edge: placement.edge)
+    }
+
+    private func reconcileEmptyHint(relativeTo plus: NSRect, edge: IslandEdge) {
+        guard EmptyWorkspaceHint.isVisible else {
+            emptyHintPanel?.orderOut(nil)
+            return
+        }
+        let panel = emptyHintPanel ?? makeEmptyHintPanel()
+        emptyHintPanel = panel
+        panel.setFrame(EmptyWorkspaceHint.frame(relativeTo: plus, edge: edge), display: true)
+        if !panel.isVisible { panel.orderFrontRegardless() }
+    }
+
+    private func makeEmptyHintPanel() -> FloatingPanel {
+        let panel = FloatingPanel(
+            size: NSSize(width: EmptyWorkspaceHintMetrics.width, height: EmptyWorkspaceHintMetrics.height)
+        )
+        let host = ScaleAwareHostingView(
+            rootView: EmptyWorkspaceHintView(
+                onOpen: {
+                    EmptyWorkspaceHint.dismiss()
+                    NotificationCenter.default.post(name: .showIslandSettings, object: nil)
+                },
+                onDismiss: {
+                    EmptyWorkspaceHint.dismiss()
+                }
+            )
+        )
+        host.wantsLayer = true
+        host.layer?.backgroundColor = NSColor.clear.cgColor
+        panel.contentView = host
+        return panel
     }
 
     private func makeEmptyWorkspacePanel(edge: IslandEdge, height: CGFloat) -> FloatingPanel {
@@ -574,6 +627,10 @@ final class IslandWindowCoordinator {
             visibleMaxY: screen.visibleFrame.maxY
         )
         panel.setFrame(moved, display: true)
+        reconcileEmptyHint(
+            relativeTo: moved,
+            edge: runtime.workspaceStore.workspace.emptyIslandPlacement.edge
+        )
         return true
     }
 }

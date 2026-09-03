@@ -7,6 +7,11 @@ string with no leading `v`. Tags add the `v`.
 
 ## Unreleased
 
+### Added
+
+- A one-shot callout on the empty-workspace plus points new installs at Settings.
+  The empty Islands canvas can open starter collections in one step.
+
 ### Changed
 
 - The README leads with the product instead of a badge-and-icon banner.

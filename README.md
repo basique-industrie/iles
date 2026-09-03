@@ -28,8 +28,9 @@ for macOS 26 (universal).
 3. Open **Iles**. Islands appear on the screen edge.
 
 A new install starts empty. The edge plus opens Settings — the island editor,
-recipe catalog, and source setup. Starter collections add coherent stacks for
-AI, Mac health, coding focus, day planning, shipping, or service monitoring.
+recipe catalog, and source setup. A one-shot hint sits beside the plus until
+you click it. Starter collections add coherent stacks for AI, Mac health,
+coding focus, day planning, shipping, or service monitoring.
 
 The notarized zip is signed. A local `scripts/package.sh` build is **Iles Dev**:
 ad-hoc, a different bundle ID, and isolated settings so it can run next to

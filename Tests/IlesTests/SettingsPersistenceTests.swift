@@ -94,6 +94,23 @@ extension IlesSelfTests {
             test.expectEqual(box.settings.claudeProbeMode(), .api, "claude probe mode persists")
             box.settings.setRefreshInterval(.off)
             test.expectEqual(box.settings.refreshInterval(), .off, "refresh interval persists")
+            test.expect(
+                !box.settings.emptyWorkspaceHintDismissed(),
+                "empty-workspace hint is visible until dismissed"
+            )
+            box.settings.setEmptyWorkspaceHintDismissed(true)
+            test.expect(
+                box.settings.emptyWorkspaceHintDismissed(),
+                "empty-workspace hint dismissal persists"
+            )
+            let reloaded = JSONSettingsRepository(
+                store: JSONSettingsStore(fileURL: box.store.fileURL),
+                secureCredentials: box.secureCredentials
+            )
+            test.expect(
+                reloaded.emptyWorkspaceHintDismissed(),
+                "empty-workspace hint dismissal reloads from settings"
+            )
         }
 
         do {

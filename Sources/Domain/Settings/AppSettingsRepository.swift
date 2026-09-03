@@ -19,4 +19,9 @@ public protocol AppSettingsRepository: Sendable {
     func claudeApiBudget() -> Double
     func setClaudeApiBudget(_ amount: Double)
 
+    // MARK: - First-run hint
+
+    func emptyWorkspaceHintDismissed() -> Bool
+    func setEmptyWorkspaceHintDismissed(_ dismissed: Bool)
+
 }

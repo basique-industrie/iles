@@ -323,12 +323,19 @@ struct IslandWorkspaceEditor: View {
                 .font(.system(size: 22, weight: .medium))
             Text("No islands yet")
                 .font(.system(size: 13, weight: .semibold))
-            Text("Add an island, then choose complications for the desktop edge.")
+            Text("Choose a starter stack, or add an empty island.")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(IslandChrome.secondaryText)
                 .multilineTextAlignment(.center)
-            QuietButton(title: "Add Island", symbol: "plus", prominence: .primary) {
-                runtime.workspaceStore.addIsland()
+            HStack(spacing: 8) {
+                QuietButton(title: "Browse collections", symbol: "square.grid.2x2", prominence: .primary) {
+                    runtime.workspaceStore.addIsland()
+                    catalogSourceID = nil
+                    presentsGallery = true
+                }
+                QuietButton(title: "Add Island", symbol: "plus") {
+                    runtime.workspaceStore.addIsland()
+                }
             }
         }
         .foregroundStyle(.white)
