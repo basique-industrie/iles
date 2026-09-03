@@ -36,9 +36,7 @@ struct IlesApp: App {
             }
         } label: {
             Image(systemName: MenuBarIdentityIcon.symbolName)
-                .renderingMode(AppIdentity.current.isDevelopment ? .original : .template)
                 .symbolRenderingMode(.monochrome)
-                .foregroundStyle(AppIdentity.current.isDevelopment ? Color(nsColor: .systemOrange) : Color.primary)
                 .accessibilityLabel(AppIdentity.current.displayName)
         }
     }

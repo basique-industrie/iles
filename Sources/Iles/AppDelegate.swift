@@ -34,12 +34,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         self.hookController = HookController(runtime: runtime)
         controller.show()
         runtime.start()
-        Task { @MainActor in
-            for delay in [50, 150, 400] as [UInt64] {
-                try? await Task.sleep(for: .milliseconds(delay))
-                MenuBarIdentityIcon.applyDevelopmentTintIfNeeded()
-            }
-        }
+        MenuBarIdentityIcon.applyDevelopmentTintIfNeeded()
         hookController?.reconcile()
         if CommandLine.arguments.contains("--open-settings") {
             showSettings()
