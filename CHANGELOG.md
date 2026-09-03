@@ -7,6 +7,8 @@ string with no leading `v`. Tags add the `v`.
 
 ## Unreleased
 
+## 0.1.0 - 2026-09-03
+
 ### Added
 
 - A one-shot callout on the empty-workspace plus points new installs at Settings.

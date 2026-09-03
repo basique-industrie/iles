@@ -16,7 +16,7 @@ Each island is a stack of rings, values, and statuses you compose from AI
 quotas, sessions, calendar, Mac health, focus, git, and service checks. There
 is no Dock icon. Nothing leaves this machine unless you turn a source on.
 
-[Download 0.1.0-beta.2](https://github.com/basique-industrie/iles/releases)
+[Download 0.1.0](https://github.com/basique-industrie/iles/releases/tag/v0.1.0)
 for macOS 26 (universal).
 [CI](https://github.com/basique-industrie/iles/actions/workflows/ci.yml)
 · [Releases](https://github.com/basique-industrie/iles/releases)
