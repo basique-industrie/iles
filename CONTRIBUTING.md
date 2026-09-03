@@ -17,8 +17,8 @@ Thanks for helping improve Iles.
 Iles requires macOS 26 and the matching Swift toolchain.
 
 ```bash
-swift build --product Iles
-swift test
+./scripts/run.sh
+./scripts/test.sh
 ./scripts/check-public-release.sh
 ```
 

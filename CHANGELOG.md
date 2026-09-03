@@ -26,6 +26,8 @@ string with no leading `v`. Tags add the `v`.
   Iles.
 - Third-party notices name SwiftTerm without a second version pin. The
   linked version is the `exact:` pin in `Package.swift`.
+- Docs and the pull-request template run `./scripts/test.sh`. `swift test`
+  does not see the custom suite.
 
 ### Removed
 

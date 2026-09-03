@@ -84,7 +84,7 @@ That packages and opens **Iles Dev** (`dist/Iles Dev.app`). Leave the GitHub
 | --- | --- |
 | `./scripts/run.sh` | Live probes in Iles Dev |
 | `./scripts/run.sh --demo` | Deterministic demo values |
-| `swift test` | Regression and security suites |
+| `./scripts/test.sh` | Regression and security suites |
 | `./scripts/check-public-release.sh` | Public-release hygiene |
 | `./scripts/package.sh` | Ad-hoc `dist/Iles Dev.app` |
 | `./scripts/package.sh --shipped` | Ad-hoc `dist/Iles.app` |

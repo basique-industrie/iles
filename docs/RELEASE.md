@@ -55,7 +55,7 @@ GitHub release as such.
 4. Run:
 
    ```bash
-   swift test
+   ./scripts/test.sh
    ./scripts/check-public-release.sh
    CHECK_HISTORY=1 ./scripts/check-public-release.sh
    ```
