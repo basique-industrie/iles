@@ -25,6 +25,11 @@ string with no leading `v`. Tags add the `v`.
 - The Iles Dev menu extra uses an orange mark so it is distinct from shipped
   Iles.
 
+### Removed
+
+- The menu extra no longer shows a disabled Demo/Live row. Demo data is still
+  `./scripts/run.sh --demo`.
+
 ### Fixed
 
 - ⌘-drag now moves the empty-workspace plus pill, and the first added island

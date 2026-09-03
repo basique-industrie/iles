@@ -17,8 +17,6 @@ struct IlesApp: App {
                 appDelegate.refresh()
             }
             .keyboardShortcut("r", modifiers: .command)
-            Button(appDelegate.usesDemoData ? "Demo Data" : "Live Data") {}
-                .disabled(true)
             Divider()
             Toggle(
                 "Launch at Login",

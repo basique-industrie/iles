@@ -13,10 +13,6 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         LaunchAtLogin.isEnabled
     }
 
-    public var usesDemoData: Bool {
-        runtime?.usesDemoData == true
-    }
-
     public func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         ProcessInfo.processInfo.disableSuddenTermination()
