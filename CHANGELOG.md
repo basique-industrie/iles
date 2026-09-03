@@ -9,6 +9,7 @@ string with no leading `v`. Tags add the `v`.
 
 ### Changed
 
+- The README leads with the product instead of a badge-and-icon banner.
 - A new install starts with an empty workspace. The edge plus opens Settings,
   or brings the existing Settings window forward if it is already open.
 - Local `scripts/package.sh` and `scripts/run.sh` now produce **Iles Dev**
