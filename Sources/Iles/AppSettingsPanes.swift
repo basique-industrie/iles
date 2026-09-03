@@ -41,6 +41,7 @@ struct GeneralSettingsPane: View {
             ) {
                 VStack(alignment: .leading, spacing: 10) {
                     MetricPair(title: "Settings file", value: JSONSettingsStore.defaultFileURL().path)
+                    MetricPair(title: "Log file", value: AppIdentity.current.logFileURL.path)
                     if let settingsError {
                         Label(settingsError, systemImage: "exclamationmark.triangle")
                             .font(.system(size: 10, weight: .medium))
@@ -68,7 +69,7 @@ struct GeneralSettingsPane: View {
             settingsError = notification.userInfo?["message"] as? String
         }
         .confirmationDialog(
-            "Delete Iles logs?",
+            "Delete \(AppIdentity.current.displayName) logs?",
             isPresented: $confirmsLogDeletion,
             titleVisibility: .visible
         ) {
@@ -81,7 +82,7 @@ struct GeneralSettingsPane: View {
 
     private func exportSupportLog() {
         let panel = NSSavePanel()
-        panel.nameFieldStringValue = "Iles-support.log"
+        panel.nameFieldStringValue = AppIdentity.current.supportLogExportFileName
         panel.canCreateDirectories = true
         guard panel.runModal() == .OK, let destination = panel.url else { return }
         do {

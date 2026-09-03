@@ -22,6 +22,20 @@ extension IlesSelfTests {
             test.expectEqual(development.displayName, "Iles Dev", "dev display name")
             test.expectEqual(shipped.dataDirectoryName, ".iles", "shipped settings directory")
             test.expectEqual(development.dataDirectoryName, ".iles-dev", "dev settings directory")
+            test.expectEqual(shipped.logDirectoryName, "Iles", "shipped log directory")
+            test.expectEqual(development.logDirectoryName, "Iles-Dev", "dev log directory")
+            test.expectEqual(shipped.logFileName, "Iles.log", "shipped log file")
+            test.expectEqual(development.logFileName, "Iles-Dev.log", "dev log file")
+            test.expectEqual(
+                shipped.supportLogExportFileName,
+                "Iles-support.log",
+                "shipped support-log export name"
+            )
+            test.expectEqual(
+                development.supportLogExportFileName,
+                "Iles-Dev-support.log",
+                "dev support-log export name"
+            )
             test.expectEqual(
                 shipped.keychainService,
                 "com.jean.iles.credentials",

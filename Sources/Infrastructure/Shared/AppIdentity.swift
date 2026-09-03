@@ -76,6 +76,13 @@ public struct AppIdentity: Sendable, Equatable {
         logsDirectory.appendingPathComponent(logFileName)
     }
 
+    public var supportLogExportFileName: String {
+        let stem = logFileName.hasSuffix(".log")
+            ? String(logFileName.dropLast(4))
+            : logFileName
+        return "\(stem)-support.log"
+    }
+
     public var hookPortFileURL: URL {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".claude")
