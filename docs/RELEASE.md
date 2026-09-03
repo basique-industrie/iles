@@ -78,7 +78,8 @@ ticket, and writes a SHA-256 checksum. Override with `ILES_SIGN_IDENTITY` or
 Pushing tag `v0.1.0-beta.2` runs the same script on the shared Basique
 Industrie Mini (`m1-mac-mini`, labels `self-hosted` and `mac-mini`) after the
 `release` environment is approved. `workflow_dispatch` with `dry_run` notarizes
-without publishing. CI uses the same runner.
+without publishing. CI uses the same runner for `main` and same-repository
+pull requests only; fork PRs are not scheduled on the Mini.
 
 Test the stapled app on a clean macOS user account before publishing.
 

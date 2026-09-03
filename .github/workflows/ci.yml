@@ -10,11 +10,17 @@ permissions:
 
 jobs:
   build-and-test:
-    # Shared Basique Industrie Mini (org runner m1-mac-mini).
+    # Shared Basique Industrie Mini. Fork PRs are untrusted code and must
+    # not execute on a machine that also holds release signing material.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, mac-mini]
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Toolchain
         run: swift --version
       - name: Resolve dependencies

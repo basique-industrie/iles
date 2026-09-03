@@ -11,6 +11,8 @@ Thanks for helping improve Iles.
   products, or unredacted diagnostic logs.
 - Confirm that any new asset can be redistributed and document its source and
   license in `THIRD_PARTY_NOTICES.md`.
+- Fork pull requests do not run on the org Mini. A maintainer will run CI
+  from a same-repository branch before merge.
 
 ## Development
 

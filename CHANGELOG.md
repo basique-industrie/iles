@@ -41,6 +41,8 @@ string with no leading `v`. Tags add the `v`.
 - GitHub repository listing no longer fails when `gh` is already logged in.
   Iles was reading `gh` through a terminal session, which opened a pager and
   hid the repository JSON.
+- Fork pull requests no longer run CI on the shared org Mini. That runner
+  also signs releases, so untrusted fork workflows stay off it.
 
 ## 0.1.0-beta.2 - 2026-09-03
 

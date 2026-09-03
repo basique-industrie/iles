@@ -36,3 +36,16 @@ Trust an extension only if you have reviewed all of its files. A trusted script
 runs with the same user permissions as Iles. Provider integrations may
 depend on vendor CLI files or undocumented endpoints and can stop working when
 vendors change them.
+
+## CI runners
+
+CI, CodeQL, and Release run on a shared Basique Industrie Mac Mini. That
+machine is not an ephemeral GitHub-hosted VM: it can see other org checkouts
+and is also used to sign notarized builds.
+
+- Fork pull requests do not run on the Mini. Same-repository branches and
+  `main` still do.
+- Outside collaborators need a maintainer to approve their workflow before
+  Actions starts.
+- Org runner access is limited to this repository. A new public repo in the
+  org does not inherit the Mini.

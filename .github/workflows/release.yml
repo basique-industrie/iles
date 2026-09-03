@@ -40,6 +40,7 @@ concurrency:
 
 jobs:
   release:
+    if: github.repository == 'basique-industrie/iles'
     runs-on: [self-hosted, mac-mini]
     permissions:
       contents: write
