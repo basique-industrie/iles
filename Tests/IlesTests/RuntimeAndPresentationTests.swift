@@ -344,5 +344,63 @@ extension IlesSelfTests {
                 "top-spacing previews do not mutate persisted workspace state"
             )
         }
+
+        do {
+            let shipped = MenuBarIdentityIcon.image(for: .shipped)
+            let development = MenuBarIdentityIcon.image(for: .development)
+            test.expect(shipped.isTemplate, "shipped extra is a template mark")
+            test.expect(!development.isTemplate, "dev extra keeps its orange color")
+            test.expectEqual(shipped.size, development.size, "dev extra uses the same mark size")
+            test.expect(
+                imageHasChromaticPixels(development),
+                "dev extra is tinted instead of a template"
+            )
+            test.expect(
+                !imageHasChromaticPixels(shipped),
+                "shipped extra stays a monochrome template"
+            )
+        }
+    }
+
+    private static func imageHasChromaticPixels(_ image: NSImage) -> Bool {
+        let size = image.size
+        guard size.width > 0, size.height > 0 else { return false }
+        let scale: CGFloat = 2
+        let width = max(1, Int((size.width * scale).rounded()))
+        let height = max(1, Int((size.height * scale).rounded()))
+        guard let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: width,
+            pixelsHigh: height,
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bytesPerRow: 0,
+            bitsPerPixel: 0
+        ) else { return false }
+        rep.size = size
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+        image.draw(in: NSRect(origin: .zero, size: size))
+        NSGraphicsContext.restoreGraphicsState()
+        for y in 0..<height {
+            for x in 0..<width {
+                guard let color = rep.colorAt(x: x, y: y)?
+                    .usingColorSpace(.deviceRGB)
+                else { continue }
+                var red: CGFloat = 0
+                var green: CGFloat = 0
+                var blue: CGFloat = 0
+                var alpha: CGFloat = 0
+                color.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+                guard alpha > 0.2 else { continue }
+                if abs(red - green) > 0.12 || abs(green - blue) > 0.12 || abs(red - blue) > 0.12 {
+                    return true
+                }
+            }
+        }
+        return false
     }
 }

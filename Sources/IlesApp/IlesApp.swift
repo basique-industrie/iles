@@ -1,41 +1,17 @@
-import AppKit
-import Infrastructure
-import SwiftUI
 import IlesCore
+import SwiftUI
 
 @main
 struct IlesApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
-        MenuBarExtra {
-            Button("Settings…") {
-                appDelegate.showSettings()
-            }
-            .keyboardShortcut(",", modifiers: .command)
-            Button("Refresh Sources") {
-                appDelegate.refresh()
-            }
-            .keyboardShortcut("r", modifiers: .command)
-            Divider()
-            Toggle(
-                "Launch at Login",
-                isOn: Binding(
-                    get: { appDelegate.launchesAtLogin },
-                    set: { appDelegate.setLaunchAtLogin($0) }
-                )
-            )
-            Button("Open Logs") {
-                AppLog.openLogsDirectory()
-            }
-            Divider()
-            Button("Quit \(AppIdentity.current.displayName)") {
-                NSApp.terminate(nil)
-            }
-        } label: {
-            Image(systemName: MenuBarIdentityIcon.symbolName)
-                .symbolRenderingMode(.monochrome)
-                .accessibilityLabel(AppIdentity.current.displayName)
+        // The extra is an AppKit status item. This scene only satisfies SwiftUI.
+        Window("Iles", id: "iles.keep-alive") {
+            EmptyView()
+                .frame(width: 0, height: 0)
         }
+        .windowResizability(.contentSize)
+        .defaultLaunchBehavior(.suppressed)
     }
 }

@@ -8,6 +8,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private var controller: IslandController?
     private var settingsController: SettingsController?
     private var hookController: HookController?
+    private var statusItemController: StatusItemController?
 
     public var launchesAtLogin: Bool {
         LaunchAtLogin.isEnabled
@@ -28,9 +29,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         self.controller = controller
         self.settingsController = SettingsController(runtime: runtime)
         self.hookController = HookController(runtime: runtime)
+        statusItemController = StatusItemController(appDelegate: self)
         controller.show()
         runtime.start()
-        MenuBarIdentityIcon.applyDevelopmentTintIfNeeded()
         hookController?.reconcile()
         if CommandLine.arguments.contains("--open-settings") {
             showSettings()

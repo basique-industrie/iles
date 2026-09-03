@@ -23,7 +23,8 @@ string with no leading `v`. Tags add the `v`.
   (`com.jean.iles.dev`, `~/.iles-dev/`) so it can run next to the notarized
   **Iles** app without sharing settings, Keychain items, or Claude hooks.
 - The Iles Dev menu extra uses an orange mark so it is distinct from shipped
-  Iles.
+  Iles. That extra is an AppKit status item, so the tint no longer depends on
+  a private status-bar getter.
 - Iles Dev General diagnostics use Iles Dev log names for the log path,
   delete prompt, and support-log export.
 - Third-party notices name SwiftTerm without a second version pin. The
