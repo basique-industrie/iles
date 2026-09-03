@@ -2,6 +2,18 @@ import Domain
 import Foundation
 import Infrastructure
 
+struct GitHubRepositoryChoice: Equatable, Sendable, Identifiable {
+    var id: String { nameWithOwner }
+    let nameWithOwner: String
+    let isPrivate: Bool
+}
+
+enum GitHubRepositoryListResult: Equatable, Sendable {
+    case repositories([GitHubRepositoryChoice])
+    case unauthenticated
+    case failed(String)
+}
+
 @MainActor
 final class GitHubComplicationSource: ComplicationSource {
     private let store: JSONSettingsStore
@@ -32,7 +44,8 @@ final class GitHubComplicationSource: ComplicationSource {
         sourceID: String = ConfigurableSourceKind.githubRepository.sourceKindID,
         placeholderName: String = ConfigurableSourceKind.githubRepository.title,
         store: JSONSettingsStore = .shared,
-        cliExecutor: any CLIExecutor = DefaultCLIExecutor()
+        // Pipes, not a PTY: `gh` pages and wraps JSON when it thinks it has a terminal.
+        cliExecutor: any CLIExecutor = SimpleCLIExecutor()
     ) {
         self.store = store
         self.cliExecutor = cliExecutor
@@ -75,6 +88,10 @@ final class GitHubComplicationSource: ComplicationSource {
         repository = nil
         store.write(value: nil, key: repositoryKey)
         cachedSnapshot = Self.setupSnapshot(sourceID: sourceID)
+    }
+
+    func listAccessibleRepositories() async -> GitHubRepositoryListResult {
+        await Self.listAccessibleRepositories(cliExecutor: cliExecutor)
     }
 
     private static let metrics: [ComplicationMetricDescriptor] = [
@@ -247,26 +264,204 @@ final class GitHubComplicationSource: ComplicationSource {
         }
     }
 
+    nonisolated static func listAccessibleRepositories(
+        cliExecutor: any CLIExecutor
+    ) async -> GitHubRepositoryListResult {
+        guard let authentication = try? await cliExecutor.execute(
+            binary: "gh",
+            args: ["auth", "status", "--hostname", "github.com"],
+            input: nil,
+            timeout: 5,
+            workingDirectory: nil,
+            autoResponses: [:]
+        ), authentication.exitCode == 0 else {
+            return .unauthenticated
+        }
+
+        let api = await repositoriesFromUserAPI(cliExecutor: cliExecutor)
+        if let repositories = api.repositories, !repositories.isEmpty {
+            return .repositories(repositories)
+        }
+        let fallback = await repositoriesFromRepoList(cliExecutor: cliExecutor)
+        if let repositories = fallback.repositories {
+            return .repositories(repositories)
+        }
+        return .failed(
+            userFacingListFailure(apiError: api.failure, fallbackError: fallback.failure)
+        )
+    }
+
+    private nonisolated static func repositoriesFromUserAPI(
+        cliExecutor: any CLIExecutor
+    ) async -> (repositories: [GitHubRepositoryChoice]?, failure: String?) {
+        let result = await runGitHubCLI(
+            cliExecutor: cliExecutor,
+            args: [
+                "api",
+                "-H", "Accept: application/vnd.github+json",
+                "-H", "X-GitHub-Api-Version: 2026-03-10",
+                "user/repos?per_page=100&sort=updated&affiliation=owner,collaborator,organization_member",
+                "--jq", "[.[] | {full_name, private}]",
+            ],
+            timeout: 20
+        )
+        guard let payload = result.object as? [[String: Any]] else {
+            return (nil, result.failure)
+        }
+        return (decodeRepositoryChoices(payload, nameKey: "full_name", privateKey: "private"), nil)
+    }
+
+    private nonisolated static func repositoriesFromRepoList(
+        cliExecutor: any CLIExecutor
+    ) async -> (repositories: [GitHubRepositoryChoice]?, failure: String?) {
+        let result = await runGitHubCLI(
+            cliExecutor: cliExecutor,
+            args: ["repo", "list", "--limit", "100", "--json", "nameWithOwner,isPrivate"],
+            timeout: 20
+        )
+        guard let payload = result.object as? [[String: Any]] else {
+            return (nil, result.failure)
+        }
+        return (decodeRepositoryChoices(payload, nameKey: "nameWithOwner", privateKey: "isPrivate"), nil)
+    }
+
+    private nonisolated static func decodeRepositoryChoices(
+        _ payload: [[String: Any]],
+        nameKey: String,
+        privateKey: String
+    ) -> [GitHubRepositoryChoice] {
+        var seen = Set<String>()
+        var choices: [GitHubRepositoryChoice] = []
+        for item in payload {
+            guard let name = item[nameKey] as? String, isValidRepository(name), seen.insert(name).inserted else {
+                continue
+            }
+            choices.append(
+                GitHubRepositoryChoice(
+                    nameWithOwner: name,
+                    isPrivate: item[privateKey] as? Bool ?? false
+                )
+            )
+        }
+        return choices
+    }
+
     private nonisolated static func jsonObject(
         endpoint: String,
         cliExecutor: any CLIExecutor
     ) async -> Any? {
-        guard let result = try? await cliExecutor.execute(
-            binary: "gh",
+        await runGitHubCLI(
+            cliExecutor: cliExecutor,
             args: [
                 "api",
                 "-H", "Accept: application/vnd.github+json",
                 "-H", "X-GitHub-Api-Version: 2026-03-10",
                 endpoint,
             ],
-            input: nil,
-            timeout: 10,
-            workingDirectory: nil,
-            autoResponses: [:]
-        ), result.exitCode == 0,
-        let data = result.output.data(using: .utf8)
-        else { return nil }
-        return try? JSONSerialization.jsonObject(with: data)
+            timeout: 10
+        ).object
+    }
+
+    private nonisolated static func runGitHubCLI(
+        cliExecutor: any CLIExecutor,
+        args: [String],
+        timeout: TimeInterval
+    ) async -> (object: Any?, failure: String?) {
+        do {
+            let result = try await cliExecutor.execute(
+                binary: "gh",
+                args: args,
+                input: nil,
+                timeout: timeout,
+                workingDirectory: nil,
+                autoResponses: [:]
+            )
+            if result.exitCode != 0 {
+                return (nil, userFacingCLIError(result.output) ?? "GitHub CLI exited with status \(result.exitCode).")
+            }
+            guard let object = firstJSONObject(in: result.output) else {
+                return (nil, "GitHub CLI returned a response that Iles could not read.")
+            }
+            return (object, nil)
+        } catch {
+            return (nil, userFacingCLIError(error.localizedDescription) ?? "GitHub CLI could not be run.")
+        }
+    }
+
+    /// `gh` sometimes prefixes JSON with an update notice on stderr, which
+    /// `SimpleCLIExecutor` concatenates onto stdout. Pull the first JSON value.
+    nonisolated static func firstJSONObject(in raw: String) -> Any? {
+        let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let start = text.firstIndex(where: { $0 == "[" || $0 == "{" }) else { return nil }
+        var depth = 0
+        var inString = false
+        var escape = false
+        var end: String.Index?
+        scan: for index in text[start...].indices {
+            let character = text[index]
+            if inString {
+                if escape {
+                    escape = false
+                    continue
+                }
+                if character == "\\" {
+                    escape = true
+                    continue
+                }
+                if character == "\"" {
+                    inString = false
+                }
+                continue
+            }
+            switch character {
+            case "\"":
+                inString = true
+            case "[", "{":
+                depth += 1
+            case "]", "}":
+                depth -= 1
+                if depth == 0 {
+                    end = index
+                    break scan
+                }
+            default:
+                break
+            }
+        }
+        guard let end else { return nil }
+        return try? JSONSerialization.jsonObject(with: Data(text[start...end].utf8))
+    }
+
+    private nonisolated static func userFacingListFailure(apiError: String?, fallbackError: String?) -> String {
+        let detail = [apiError, fallbackError]
+            .compactMap { $0 }
+            .first { !$0.isEmpty }
+        if let detail {
+            return detail
+        }
+        return "GitHub CLI did not return a repository list."
+    }
+
+    private nonisolated static func userFacingCLIError(_ raw: String) -> String? {
+        let line = raw
+            .split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty }
+        guard var line, !line.isEmpty else { return nil }
+        line = line.replacingOccurrences(
+            of: #"\b(?:gho|ghu|ghs|github_pat)_[A-Za-z0-9_]+"#,
+            with: "<redacted>",
+            options: .regularExpression
+        )
+        if line.count > 160 {
+            return String(line.prefix(157)) + "…"
+        }
+        return line
+    }
+
+    nonisolated static func selectableRepository(from raw: String) -> String? {
+        let normalized = normalizedRepository(raw)
+        return isValidRepository(normalized) ? normalized : nil
     }
 
     private nonisolated static func normalizedRepository(_ raw: String) -> String {

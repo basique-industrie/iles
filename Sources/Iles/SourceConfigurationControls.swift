@@ -174,13 +174,22 @@ struct SourceGitControls: View {
 struct SourceGitHubControls: View {
     let source: GitHubComplicationSource
     let didChange: () -> Void
-    @State private var repository: String
+    @State private var query: String
+    @State private var listings: [GitHubRepositoryChoice] = []
+    @State private var loadState: LoadState = .loading
     @State private var validationMessage: String?
+
+    private enum LoadState: Equatable {
+        case loading
+        case ready
+        case unauthenticated
+        case failed(String)
+    }
 
     init(source: GitHubComplicationSource, didChange: @escaping () -> Void) {
         self.source = source
         self.didChange = didChange
-        _repository = State(initialValue: source.repositoryText)
+        _query = State(initialValue: source.repositoryText)
     }
 
     var body: some View {
@@ -188,35 +197,169 @@ struct SourceGitHubControls: View {
             title: "Repository",
             subtitle: "Uses your existing GitHub CLI login; no token is stored."
         ) {
-            IslandTextField(
-                title: "GitHub Repository",
-                text: $repository,
-                prompt: "owner/repository",
-                validationMessage: validationMessage
-            ) {
-                saveRepository()
+            HStack(spacing: 7) {
+                HStack(spacing: 7) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(IslandChrome.tertiaryText)
+                    TextField("Search or enter owner/repository", text: $query)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 12, weight: .medium))
+                        .onSubmit(selectTypedRepository)
+                }
+                .padding(.horizontal, 9)
+                .frame(height: 32)
+                .background(
+                    IslandChrome.fieldFill,
+                    in: RoundedRectangle(cornerRadius: IslandChrome.fieldRadius, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: IslandChrome.fieldRadius, style: .continuous)
+                        .strokeBorder(IslandChrome.controlBorder, lineWidth: 1)
+                }
+                QuietIconButton(
+                    symbol: "arrow.clockwise",
+                    accessibilityName: "Reload repositories",
+                    helpText: "Reload repositories from GitHub CLI"
+                ) {
+                    Task { await loadRepositories() }
+                }
             }
+
+            repositoryList
+
+            if let validationMessage {
+                Label(validationMessage, systemImage: "exclamationmark.circle")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Color.orange.opacity(0.9))
+            }
+
             if source.repository != nil {
                 HStack {
                     Spacer()
                     QuietButton(title: "Clear", symbol: "xmark", role: .destructive) {
                         source.clearRepository()
-                        repository = ""
+                        query = ""
                         validationMessage = nil
                         didChange()
                     }
                 }
             }
         }
+        .task {
+            await loadRepositories()
+        }
     }
 
-    private func saveRepository() {
-        if source.setRepository(repository) {
+    @ViewBuilder
+    private var repositoryList: some View {
+        switch loadState {
+        case .loading:
+            SettingsCaption(text: "Loading repositories from GitHub CLI…")
+                .padding(.vertical, 8)
+        case .unauthenticated:
+            SettingsCaption(text: "GitHub CLI is missing or not authenticated. Install gh and run gh auth login.")
+        case .failed(let message):
+            SettingsCaption(text: message)
+        case .ready:
+            let rows = visibleListings
+            if rows.isEmpty {
+                SettingsCaption(text: emptyListMessage)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 2) {
+                        ForEach(rows) { listing in
+                            repositoryRow(listing)
+                        }
+                    }
+                }
+                .frame(maxHeight: 220)
+            }
+        }
+    }
+
+    private var visibleListings: [GitHubRepositoryChoice] {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let filtered = needle.isEmpty
+            ? listings
+            : listings.filter { $0.nameWithOwner.localizedCaseInsensitiveContains(needle) }
+        guard let typed = GitHubComplicationSource.selectableRepository(from: needle),
+              !filtered.contains(where: { $0.nameWithOwner.compare(typed, options: .caseInsensitive) == .orderedSame })
+        else { return filtered }
+        return [GitHubRepositoryChoice(nameWithOwner: typed, isPrivate: false)] + filtered
+    }
+
+    private var emptyListMessage: String {
+        query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? "No repositories were returned for this GitHub login."
+            : "No repositories match this search. Press Return to use owner/repository."
+    }
+
+    private func repositoryRow(_ listing: GitHubRepositoryChoice) -> some View {
+        let selected = source.repository?.compare(listing.nameWithOwner, options: .caseInsensitive) == .orderedSame
+        return Button {
+            select(listing.nameWithOwner)
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: listing.isPrivate ? "lock.fill" : "book.closed")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(IslandChrome.tertiaryText)
+                    .frame(width: 14)
+                Text(listing.nameWithOwner)
+                    .font(.system(size: 12, weight: selected ? .semibold : .medium))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                Spacer(minLength: 6)
+                if selected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.white)
+                }
+            }
+            .padding(.horizontal, 9)
+            .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
+            .background(
+                selected ? IslandChrome.selectedFill : Color.clear,
+                in: RoundedRectangle(cornerRadius: IslandChrome.rowRadius, style: .continuous)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: IslandChrome.rowRadius, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func loadRepositories() async {
+        loadState = .loading
+        switch await source.listAccessibleRepositories() {
+        case .repositories(let repositories):
+            listings = repositories
+            if let current = source.repository,
+               !listings.contains(where: {
+                   $0.nameWithOwner.compare(current, options: .caseInsensitive) == .orderedSame
+               }) {
+                listings.insert(GitHubRepositoryChoice(nameWithOwner: current, isPrivate: false), at: 0)
+            }
+            loadState = .ready
+        case .unauthenticated:
+            listings = []
+            loadState = .unauthenticated
+        case .failed(let message):
+            listings = []
+            loadState = .failed(message)
+        }
+    }
+
+    private func select(_ raw: String) {
+        if source.setRepository(raw) {
+            query = source.repositoryText
             validationMessage = nil
             didChange()
         } else {
             validationMessage = "Enter owner/repository or a GitHub repository URL."
         }
+    }
+
+    private func selectTypedRepository() {
+        select(query)
     }
 }
 

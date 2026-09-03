@@ -315,6 +315,62 @@ extension IlesSelfTests {
             let github = GitHubComplicationSource(store: box.store, cliExecutor: githubExecutor)
             test.expect(github.setRepository("https://github.com/openai/example.git"), "GitHub source accepts repository URLs")
             test.expect(!github.setRepository("openai/example?inject=true"), "GitHub source rejects endpoint syntax in repository names")
+            test.expectEqual(
+                GitHubComplicationSource.selectableRepository(from: "https://github.com/basique-industrie/iles.git"),
+                "basique-industrie/iles",
+                "typed GitHub URLs normalize to owner/repository"
+            )
+
+            let listExecutor = RecordingCLIExecutor { arguments in
+                if arguments == ["auth", "status", "--hostname", "github.com"] { return CLIResult(output: "") }
+                if arguments.contains(where: { $0.contains("user/repos") }) {
+                    return CLIResult(output: #"[{"full_name":"basique-industrie/iles","private":false},{"full_name":"jean-humann/gwnative","private":true},{"full_name":"bad"},{"full_name":"owner/name?x=1"}]"#)
+                }
+                return CLIResult(output: "[]", exitCode: 1)
+            }
+            let listed = await GitHubComplicationSource.listAccessibleRepositories(cliExecutor: listExecutor)
+            test.expectEqual(
+                listed,
+                .repositories([
+                    GitHubRepositoryChoice(nameWithOwner: "basique-industrie/iles", isPrivate: false),
+                    GitHubRepositoryChoice(nameWithOwner: "jean-humann/gwnative", isPrivate: true),
+                ]),
+                "GitHub source lists accessible repositories from gh"
+            )
+
+            let fallbackExecutor = RecordingCLIExecutor { arguments in
+                if arguments == ["auth", "status", "--hostname", "github.com"] { return CLIResult(output: "") }
+                if arguments.starts(with: ["repo", "list"]) {
+                    return CLIResult(output: #"[{"nameWithOwner":"owner/fallback","isPrivate":false}]"#)
+                }
+                return CLIResult(output: "{}", exitCode: 1)
+            }
+            let fallback = await GitHubComplicationSource.listAccessibleRepositories(cliExecutor: fallbackExecutor)
+            test.expectEqual(
+                fallback,
+                .repositories([GitHubRepositoryChoice(nameWithOwner: "owner/fallback", isPrivate: false)]),
+                "GitHub source falls back to gh repo list when the user API is unavailable"
+            )
+
+            let signedOut = RecordingCLIExecutor { _ in CLIResult(output: "", exitCode: 1) }
+            let signedOutList = await GitHubComplicationSource.listAccessibleRepositories(cliExecutor: signedOut)
+            test.expectEqual(signedOutList, .unauthenticated, "GitHub listing requires an authenticated gh session")
+
+            let noisyList = RecordingCLIExecutor { arguments in
+                if arguments == ["auth", "status", "--hostname", "github.com"] { return CLIResult(output: "") }
+                if arguments.contains(where: { $0.contains("user/repos") }) {
+                    return CLIResult(
+                        output: "A new release of gh is available: 2.99.0\n[{\"full_name\":\"owner/from-notice\",\"private\":false}]\n"
+                    )
+                }
+                return CLIResult(output: "[]", exitCode: 1)
+            }
+            let noisy = await GitHubComplicationSource.listAccessibleRepositories(cliExecutor: noisyList)
+            test.expectEqual(
+                noisy,
+                .repositories([GitHubRepositoryChoice(nameWithOwner: "owner/from-notice", isPrivate: false)]),
+                "GitHub listing reads JSON when gh prints a notice before the payload"
+            )
             let githubSnapshot = await github.refresh(.interactive)
             test.expectEqual(githubSnapshot.values["ci"]?.displayText, "Passing", "GitHub source maps successful Actions runs")
             test.expectEqual(githubSnapshot.values["reviews"]?.displayText, "1", "GitHub source counts requested reviews")

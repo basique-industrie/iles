@@ -11,6 +11,8 @@ string with no leading `v`. Tags add the `v`.
 
 - A one-shot callout on the empty-workspace plus points new installs at Settings.
   The empty Islands canvas can open starter collections in one step.
+- GitHub repository setup lists repositories from the existing `gh` login so a
+  repo can be selected instead of typed.
 
 ### Changed
 
@@ -27,6 +29,9 @@ string with no leading `v`. Tags add the `v`.
 
 - ⌘-drag now moves the empty-workspace plus pill, and the first added island
   keeps that placement.
+- GitHub repository listing no longer fails when `gh` is already logged in.
+  Iles was reading `gh` through a terminal session, which opened a pager and
+  hid the repository JSON.
 
 ## 0.1.0-beta.2 - 2026-09-03
 
