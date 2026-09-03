@@ -24,6 +24,8 @@ string with no leading `v`. Tags add the `v`.
   **Iles** app without sharing settings, Keychain items, or Claude hooks.
 - The Iles Dev menu extra uses an orange mark so it is distinct from shipped
   Iles.
+- Third-party notices name SwiftTerm without a second version pin. The
+  linked version is the `exact:` pin in `Package.swift`.
 
 ### Removed
 

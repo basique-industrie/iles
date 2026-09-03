@@ -69,6 +69,16 @@ grep -q 'NSPrivacyAccessedAPICategoryFileTimestamp' Sources/Iles/Resources/Priva
   exit 1
 }
 
+SWIFTTERM_VERSION="$(sed -n 's/.*SwiftTerm\.git", exact: "\([^"]*\)".*/\1/p' Package.swift | head -n 1)"
+[[ -n "$SWIFTTERM_VERSION" ]] || {
+  echo "Package.swift must pin SwiftTerm with exact: \"X.Y.Z\"." >&2
+  exit 1
+}
+grep -q "^### SwiftTerm$" THIRD_PARTY_NOTICES.md || {
+  echo "THIRD_PARTY_NOTICES.md must name SwiftTerm without a second version pin." >&2
+  exit 1
+}
+
 git diff --check
 
 if git grep --untracked -I -n -E -e \

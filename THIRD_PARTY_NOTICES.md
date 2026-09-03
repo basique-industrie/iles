@@ -5,12 +5,13 @@ and assets remain subject to their own terms.
 
 ## Runtime dependency
 
-### SwiftTerm 1.15.0
+### SwiftTerm
 
-Copyright (c) 2019–2022 Miguel de Icaza; 2017–2019 the xterm.js authors;
+Copyright (c) 2019–2026 Miguel de Icaza; 2017–2019 the xterm.js authors;
 2014–2016 SourceLair Private Company; 2012–2013 Christopher Jeffrey.
 
-SwiftTerm is licensed under the MIT License. Its complete notice is bundled in
+SwiftTerm is licensed under the MIT License. The linked version is the
+`exact:` pin in `Package.swift`. Its complete notice is bundled in
 `Sources/Iles/Resources/Licenses/SwiftTerm-MIT.txt` and distributed with
 the application.
 

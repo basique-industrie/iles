@@ -70,7 +70,14 @@ plutil -replace CFBundleExecutable -string "$EXECUTABLE_NAME" "$STAGED_APP/Conte
 install -m 0644 "$ICON" "$STAGED_APP/Contents/Resources/Iles.icns"
 install -m 0644 Sources/Iles/Resources/PrivacyInfo.xcprivacy "$STAGED_APP/Contents/Resources/PrivacyInfo.xcprivacy"
 install -m 0644 LICENSE "$STAGED_APP/Contents/Resources/LICENSE.txt"
+SWIFTTERM_VERSION="$(sed -n 's/.*SwiftTerm\.git", exact: "\([^"]*\)".*/\1/p' Package.swift | head -n 1)"
+[[ -n "$SWIFTTERM_VERSION" ]] || {
+  echo "Package.swift must pin SwiftTerm with exact: \"X.Y.Z\"." >&2
+  exit 1
+}
 install -m 0644 THIRD_PARTY_NOTICES.md "$STAGED_APP/Contents/Resources/THIRD_PARTY_NOTICES.md"
+sed -i '' -E "s/^### SwiftTerm$/### SwiftTerm ${SWIFTTERM_VERSION}/" \
+  "$STAGED_APP/Contents/Resources/THIRD_PARTY_NOTICES.md"
 printf 'APPL????' > "$STAGED_APP/Contents/PkgInfo"
 
 # SPM's generated Bundle.module looks next to the .app, which codesign rejects
@@ -86,7 +93,15 @@ for resource in Sources/Iles/Resources/*; do
 done
 for license in Sources/Iles/Resources/Licenses/*; do
   [[ -f "$license" ]] || continue
-  install -m 0644 "$license" "$BUNDLED_RESOURCES/${license:t}"
+  if [[ "${license:t}" == "SwiftTerm-MIT.txt" ]]; then
+    {
+      printf 'SwiftTerm %s\n\n' "$SWIFTTERM_VERSION"
+      cat "$license"
+    } > "$BUNDLED_RESOURCES/${license:t}"
+    chmod 0644 "$BUNDLED_RESOURCES/${license:t}"
+  else
+    install -m 0644 "$license" "$BUNDLED_RESOURCES/${license:t}"
+  fi
 done
 [[ -f "$BUNDLED_RESOURCES/ClaudeIcon.svg" ]] || {
   echo "Missing packaged resource bundle at $BUNDLED_RESOURCES" >&2
