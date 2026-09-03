@@ -14,7 +14,12 @@ updates:
       swift:
         patterns:
           - "*"
+        update-types:
+          - minor
+          - patch
 
+  # Majors stay ungrouped so a checkout 6 → 7 style bump is its own PR
+  # and is applied in every workflow, not only CI.
   - package-ecosystem: github-actions
     directory: /
     schedule:
@@ -28,3 +33,6 @@ updates:
       github-actions:
         patterns:
           - "*"
+        update-types:
+          - minor
+          - patch
