@@ -287,18 +287,22 @@ final class VectorMarkContainerView: NSView {
 /// the `.app`. Development `swift run` finds it beside the executable. A
 /// packaged app also keeps a copy under `Contents/Resources`.
 enum IlesResourceBundle {
-    static let bundle: Bundle = {
+    static let bundle: Bundle = resolve(applicationBundle: .main, moduleBundle: .module)
+
+    /// Packaged apps keep `Iles_IlesCore.bundle` under `Contents/Resources`.
+    /// SPM's `Bundle.module` looks next to the `.app`, which codesign rejects.
+    static func resolve(applicationBundle: Bundle, moduleBundle: Bundle) -> Bundle {
         let candidates = [
-            Bundle.main.bundleURL.appendingPathComponent("Iles_IlesCore.bundle"),
-            Bundle.main.resourceURL?.appendingPathComponent("Iles_IlesCore.bundle"),
+            applicationBundle.bundleURL.appendingPathComponent("Iles_IlesCore.bundle"),
+            applicationBundle.resourceURL?.appendingPathComponent("Iles_IlesCore.bundle"),
         ].compactMap { $0 }
         for url in candidates where FileManager.default.fileExists(atPath: url.path) {
             if let bundle = Bundle(url: url) {
                 return bundle
             }
         }
-        return .module
-    }()
+        return moduleBundle
+    }
 }
 
 @MainActor

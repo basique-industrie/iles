@@ -28,6 +28,7 @@ extension IlesSelfTests {
             Bundle.module.url(forResource: "GitHubIcon", withExtension: "svg") != nil,
             "official GitHub source mark is bundled"
         )
+        runPackagedResourceBundleTests(test)
 
         let demo = IsolatedBox.make()
         defer { demo.tearDown() }
@@ -771,5 +772,128 @@ extension IlesSelfTests {
             test.expect(false, "message-only parse: \(error)")
         }
 
+    }
+
+    /// Packaged apps resolve marks from `Contents/Resources/Iles_IlesCore.bundle`,
+    /// not from SPM's `Bundle.module` next to the `.app`.
+    @MainActor
+    private static func runPackagedResourceBundleTests(_ test: TestHarness) {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("iles-resource-bundle-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let svg = projectRoot().appendingPathComponent("Sources/Iles/Resources/GitHubIcon.svg")
+        guard let svgData = try? Data(contentsOf: svg), !svgData.isEmpty else {
+            test.expect(false, "GitHubIcon.svg is available to build a packaged resource bundle")
+            return
+        }
+
+        let appURL = root.appendingPathComponent("Iles.app")
+        let emptyModuleURL = root.appendingPathComponent("Empty.bundle")
+        do {
+            try writeFakeApplication(
+                at: appURL,
+                resourceFiles: ["GitHubIcon.svg": svgData]
+            )
+            try writeBundle(at: emptyModuleURL, identifier: "com.jean.iles.empty-module")
+        } catch {
+            test.expect(false, "packaged resource-bundle fixture: \(error.localizedDescription)")
+            return
+        }
+
+        guard let application = Bundle(url: appURL),
+              let emptyModule = Bundle(url: emptyModuleURL)
+        else {
+            test.expect(false, "fake application and empty module bundles load")
+            return
+        }
+
+        let packaged = IlesResourceBundle.resolve(applicationBundle: application, moduleBundle: emptyModule)
+        test.expect(
+            packaged.bundleURL.path.hasSuffix("Contents/Resources/Iles_IlesCore.bundle"),
+            "packaged layout resolves Iles_IlesCore.bundle from Contents/Resources"
+        )
+        test.expect(
+            packaged.url(forResource: "GitHubIcon", withExtension: "svg") != nil,
+            "packaged resource bundle exposes GitHubIcon.svg"
+        )
+        test.expect(
+            packaged.url(forResource: "GitHubIcon", withExtension: "svg").flatMap(NSImage.init(contentsOf:))?
+                .representations.isEmpty == false,
+            "packaged GitHubIcon.svg decodes"
+        )
+
+        let missingAppURL = root.appendingPathComponent("Missing.app")
+        do {
+            try writeFakeApplication(at: missingAppURL, resourceFiles: [:])
+        } catch {
+            test.expect(false, "missing-resource application fixture: \(error.localizedDescription)")
+            return
+        }
+        guard let missingApplication = Bundle(url: missingAppURL) else {
+            test.expect(false, "application without a resource bundle still loads")
+            return
+        }
+        let fallback = IlesResourceBundle.resolve(
+            applicationBundle: missingApplication,
+            moduleBundle: emptyModule
+        )
+        test.expectEqual(
+            fallback.bundleURL.path,
+            emptyModule.bundleURL.path,
+            "missing packaged bundle falls back to the module bundle"
+        )
+    }
+
+    private static func writeFakeApplication(at appURL: URL, resourceFiles: [String: Data]) throws {
+        let contents = appURL.appendingPathComponent("Contents", isDirectory: true)
+        let macos = contents.appendingPathComponent("MacOS", isDirectory: true)
+        let resources = contents.appendingPathComponent("Resources", isDirectory: true)
+        let core = resources.appendingPathComponent("Iles_IlesCore.bundle", isDirectory: true)
+        let fm = FileManager.default
+        try fm.createDirectory(at: macos, withIntermediateDirectories: true)
+        try Data("#".utf8).write(to: macos.appendingPathComponent("Iles"))
+        try writePlist(
+            [
+                "CFBundleIdentifier": "com.jean.iles.resource-bundle-test",
+                "CFBundleName": "Iles",
+                "CFBundleExecutable": "Iles",
+                "CFBundlePackageType": "APPL",
+                "CFBundleInfoDictionaryVersion": "6.0",
+            ],
+            to: contents.appendingPathComponent("Info.plist")
+        )
+        if !resourceFiles.isEmpty {
+            try writeBundle(
+                at: core,
+                identifier: "Iles_IlesCore",
+                files: resourceFiles
+            )
+        }
+    }
+
+    private static func writeBundle(
+        at url: URL,
+        identifier: String,
+        files: [String: Data] = [:]
+    ) throws {
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        try writePlist(
+            [
+                "CFBundleIdentifier": identifier,
+                "CFBundleName": url.deletingPathExtension().lastPathComponent,
+                "CFBundlePackageType": "BNDL",
+                "CFBundleInfoDictionaryVersion": "6.0",
+            ],
+            to: url.appendingPathComponent("Info.plist")
+        )
+        for (name, data) in files {
+            try data.write(to: url.appendingPathComponent(name))
+        }
+    }
+
+    private static func writePlist(_ values: [String: Any], to url: URL) throws {
+        let data = try PropertyListSerialization.data(fromPropertyList: values, format: .xml, options: 0)
+        try data.write(to: url)
     }
 }
