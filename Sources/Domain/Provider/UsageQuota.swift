@@ -114,6 +114,48 @@ public struct UsageQuota: Sendable, Equatable, Hashable, Comparable {
         dollarRemaining != nil
     }
 
+    /// Session / weekly / Models / Other when this quota is a time window.
+    public var windowKind: QuotaWindowKind? {
+        if let compactTitle, let kind = QuotaWindowKind.parse(compactTitle) {
+            return kind
+        }
+        switch quotaType {
+        case .session:
+            return .session
+        case .weekly:
+            return .weekly
+        case .modelSpecific:
+            return nil
+        case .timeLimit(let name):
+            return QuotaWindowKind.inferred(from: name)
+        }
+    }
+
+    /// Weekly / 7-day windows, including Harnais `time:… 7d` keys that are
+    /// not stored as `QuotaType.weekly`.
+    public var isWeeklyWindow: Bool {
+        windowKind == .weekly
+    }
+
+    /// One island glance per Harnais account: weekly when present, otherwise
+    /// Cursor Models.
+    public var isAccountGlanceWindow: Bool {
+        windowKind == .weekly || windowKind == .models
+    }
+
+    /// Drops mailbox segments so hover and recipes never show emails.
+    public static func privacySafeTitle(_ text: String?) -> String? {
+        guard let text, !text.isEmpty else { return nil }
+        if text.contains("@") {
+            let parts = text.split(separator: "·").map {
+                $0.trimmingCharacters(in: .whitespacesAndNewlines)
+            }.filter { !$0.isEmpty && !$0.contains("@") }
+            let joined = parts.joined(separator: " · ")
+            return joined.isEmpty ? nil : joined
+        }
+        return text
+    }
+
     /// Formatted balance remaining string (e.g., "$50.00", "¥110.00"), nil for percentage-based quotas.
     /// The symbol follows `currency` (default "$" when nil or USD).
     public var formattedDollarRemaining: String? {
@@ -312,5 +354,47 @@ public extension Collection where Element == UsageQuota {
               latest.timeIntervalSince(earliest) <= 60
         else { return nil }
         return first?.resetTimestampDescription
+    }
+}
+
+/// Named time window used by aggregators (Harnais) and hover captions.
+public enum QuotaWindowKind: String, Sendable, Hashable {
+    case session
+    case weekly
+    case models
+    case other
+
+    public var caption: String {
+        switch self {
+        case .session: "Session"
+        case .weekly: "Weekly"
+        case .models: "Models"
+        case .other: "Other"
+        }
+    }
+
+    public static func parse(_ text: String) -> QuotaWindowKind? {
+        switch text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "5h", "session": .session
+        case "7d", "weekly": .weekly
+        case "models": .models
+        case "other": .other
+        default: nil
+        }
+    }
+
+    /// Last whitespace token, then substring fallbacks for Harnais type keys
+    /// like `time:Claude · work 7d` or `quota.key.time:Cursor · Default Models`.
+    public static func inferred(from text: String) -> QuotaWindowKind? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let kind = parse(trimmed) { return kind }
+        let last = trimmed.split(whereSeparator: \.isWhitespace).last.map(String.init) ?? trimmed
+        if let kind = parse(last) { return kind }
+        let lowered = trimmed.lowercased()
+        if lowered.contains("7d") || lowered.hasSuffix("weekly") { return .weekly }
+        if lowered.contains("5h") || lowered.contains("session") { return .session }
+        if lowered.contains("models") { return .models }
+        if lowered.contains("other") { return .other }
+        return nil
     }
 }

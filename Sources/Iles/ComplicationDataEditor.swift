@@ -13,30 +13,21 @@ struct ComplicationDataEditor: View {
 
     var body: some View {
         SettingsGroup(
-            title: dataSlotCount > 1 ? "Rings" : "Content",
+            title: "Data",
             subtitle: dataSlotCount > 1
-                ? "Choose what each ring shows and how it is colored."
-                : "Choose the value and its appearance."
+                ? "Choose the value and color for each position."
+                : "Choose the value this widget shows."
         ) {
-            VStack(spacing: 0) {
+            VStack(spacing: 12) {
                 ForEach(0..<dataSlotCount, id: \.self) { index in
                     dataSlotEditor(index: index)
-                    if index < dataSlotCount - 1 {
-                        SettingsHairline()
-                            .padding(.leading, 50)
-                    }
                 }
-            }
-            .background(IslandChrome.cardFill, in: RoundedRectangle(cornerRadius: IslandChrome.rowRadius, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: IslandChrome.rowRadius, style: .continuous)
-                    .strokeBorder(IslandChrome.hairline.opacity(0.72), lineWidth: 1)
             }
 
             if complication.family == .dualRing {
                 HStack {
                     Spacer()
-                    QuietButton(title: "Swap Rings", symbol: "arrow.up.arrow.down") {
+                    QuietButton(title: "Swap rings", symbol: "arrow.up.arrow.down") {
                         swapMetricSlots()
                     }
                 }
@@ -55,84 +46,84 @@ struct ComplicationDataEditor: View {
     }
 
     private func dataSlotEditor(index: Int) -> some View {
-        HStack(spacing: 6) {
-            metricSlotGlyph(index: index)
-                .frame(width: 29, height: 29)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(shortMetricSlotName(index: index))
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.white)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                metricSlotGlyph(index: index)
+                    .frame(width: 29, height: 29)
+                    .accessibilityHidden(true)
+                Text(metricSlotName(index: index))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(IslandChrome.text)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .help(metricSlotExplanation(index: index))
+                Spacer(minLength: 8)
                 if let preview = metricPreviewValue(index: index) {
                     Text(preview)
-                        .font(.system(size: 8, weight: .semibold, design: .rounded))
-                        .foregroundStyle(IslandChrome.tertiaryText)
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(IslandChrome.secondaryText)
                         .monospacedDigit()
                         .lineLimit(1)
+                        .help(preview)
                 }
             }
-            .frame(width: 44, alignment: .leading)
-            .help(metricSlotExplanation(index: index))
 
             metricPicker(index: index)
-                .frame(maxWidth: .infinity)
-                .layoutPriority(1)
 
             if supportsValueMode(index: index) {
-                valueModePicker(index: index)
-            }
-
-            colorPickerButton(index: index)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-    }
-
-    private func valueModePicker(index: Int) -> some View {
-        let selected = complication.valueMode(at: index)
-        return Menu {
-            ForEach(ComplicationValueMode.allCases, id: \.self) { mode in
-                Button {
-                    valueMode(index: index).wrappedValue = mode
-                } label: {
-                    Label(
-                        mode == .used ? "Used" : "Remaining",
-                        systemImage: mode == selected ? "checkmark" : "circle"
+                VStack(alignment: .leading, spacing: 6) {
+                    FieldLabel(title: "Show")
+                    IslandSegmentBar(
+                        items: Array(ComplicationValueMode.allCases),
+                        selection: valueMode(index: index),
+                        title: { $0 == .used ? "Used" : "Remaining" }
                     )
+                    .accessibilityElement(children: .contain)
+                    .accessibilityLabel("\(metricSlotName(index: index)) value presentation")
+                    .help("Show quota used or quota remaining")
                 }
             }
-        } label: {
-            Text(selected == .used ? "Used" : "Remaining")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(.white)
-                .lineLimit(1)
+
+            HStack(spacing: 8) {
+                FieldLabel(title: "Color")
+                Spacer(minLength: 8)
+                colorPickerButton(index: index)
+            }
         }
-        .menuStyle(.borderlessButton)
-        .frame(width: 104, height: chooserHeight)
-        .settingsPopupChrome(compact: true)
-        .accessibilityLabel("Value presentation")
-        .help("Show quota used or quota remaining")
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(IslandChrome.cardFill, in: RoundedRectangle(cornerRadius: IslandChrome.rowRadius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: IslandChrome.rowRadius, style: .continuous)
+                .strokeBorder(IslandChrome.hairline, lineWidth: 1)
+                .allowsHitTesting(false)
+        }
     }
 
     private func colorPickerButton(index: Int) -> some View {
         Button {
             colorEditorIndex = index
         } label: {
-            HStack(spacing: 3) {
+            HStack(spacing: 7) {
                 Circle()
                     .fill(slotDisplayColor(index: index))
                     .frame(width: 14, height: 14)
                     .overlay {
-                        Circle().strokeBorder(Color.white.opacity(0.28), lineWidth: 1)
+                        Circle().strokeBorder(IslandChrome.hairline, lineWidth: 1)
                     }
+                Text(colorTitle(index: index))
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(IslandChrome.text)
+                    .lineLimit(1)
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 7, weight: .bold))
+                    .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(IslandChrome.secondaryText)
             }
-            .frame(width: 38, height: chooserHeight)
-            .background(IslandChrome.selectedFill, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .padding(.horizontal, 9)
+            .frame(height: chooserHeight)
+            .background(IslandChrome.fieldFill, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(IslandChrome.selectionBorder, lineWidth: 1)
+                    .strokeBorder(IslandChrome.controlBorder, lineWidth: 1)
             }
             .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
@@ -146,21 +137,21 @@ struct ComplicationDataEditor: View {
 
     private func colorEditor(index: Int) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("\(metricSlotName(index: index)) Color")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.white)
+            Text("\(metricSlotName(index: index)) color")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(IslandChrome.text)
 
             colorPresetButton(
                 index: index,
                 style: .source,
-                title: "Source Accent",
+                title: "Source accent",
                 color: sourceAccent
             )
             colorPresetButton(
                 index: index,
                 style: .monochrome,
                 title: "Monochrome",
-                color: Color.white.opacity(0.82)
+                color: IslandChrome.text
             )
 
             ColorPicker(
@@ -169,23 +160,23 @@ struct ComplicationDataEditor: View {
             ) {
                 HStack(spacing: 8) {
                     Image(systemName: "paintpalette")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                         .frame(width: 16)
-                    Text("Custom Color")
-                        .font(.system(size: 11, weight: .medium))
+                    Text("Custom color")
+                        .font(.system(size: 12, weight: .medium))
                     Spacer(minLength: 8)
                     if resolvedTint(index: index).style == .custom {
                         Image(systemName: "checkmark")
-                            .font(.system(size: 9, weight: .bold))
+                            .font(.system(size: 12, weight: .bold))
                     }
                 }
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(IslandChrome.text)
             .padding(.horizontal, 8)
             .frame(minHeight: 32)
             .background(
                 resolvedTint(index: index).style == .custom ? IslandChrome.selectedFill : Color.clear,
-                in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+                in: RoundedRectangle(cornerRadius: 8, style: .continuous)
             )
         }
         .padding(10)
@@ -207,20 +198,20 @@ struct ComplicationDataEditor: View {
                 Circle()
                     .fill(color)
                     .frame(width: 12, height: 12)
-                    .overlay { Circle().strokeBorder(Color.white.opacity(0.24), lineWidth: 1) }
+                    .overlay { Circle().strokeBorder(IslandChrome.hairline, lineWidth: 1) }
                 Text(title)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 12, weight: .medium))
                 Spacer(minLength: 8)
                 if selected {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 9, weight: .bold))
+                        .font(.system(size: 12, weight: .bold))
                 }
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(IslandChrome.text)
             .padding(.horizontal, 8)
             .frame(minHeight: 32)
-            .background(selected ? IslandChrome.selectedFill : Color.clear, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .background(selected ? IslandChrome.selectedFill : Color.clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
         .buttonStyle(.plain)
     }
@@ -238,35 +229,98 @@ struct ComplicationDataEditor: View {
         let candidates = compatibleMetrics(for: complication.family)
         let selectedID = complication.metricIDs.indices.contains(index) ? complication.metricIDs[index] : nil
         let selectedMetric = candidates.first { $0.id == selectedID }
+        let groups = metricMenuGroups(candidates: candidates)
 
         return Menu {
-            ForEach(candidates, id: \.id) { candidate in
-                let assignedElsewhere = isMetricAssigned(candidate.id, excluding: index)
-                Button {
-                    metric(index: index).wrappedValue = candidate.id
-                } label: {
-                    Label(
-                        assignedElsewhere ? "\(candidate.name) — In Use" : candidate.name,
-                        systemImage: candidate.id == selectedID
-                            ? "checkmark"
-                            : candidate.symbol ?? candidate.kind.inspectorSymbol
-                    )
+            if groups.isEmpty {
+                ForEach(candidates, id: \.id) { candidate in
+                    metricOption(candidate, index: index, selectedID: selectedID)
                 }
-                .disabled(assignedElsewhere)
+            } else {
+                ForEach(Array(groups.enumerated()), id: \.offset) { _, group in
+                    Section(group.title) {
+                        ForEach(group.metrics, id: \.id) { candidate in
+                            metricOption(candidate, index: index, selectedID: selectedID, grouped: true)
+                        }
+                    }
+                }
             }
         } label: {
-            SettingsMenuLabel(
-                symbol: selectedMetric?.symbol ?? selectedMetric?.kind.inspectorSymbol ?? "questionmark",
-                title: selectedMetric?.name ?? "Choose Data",
-                compact: true,
-                controlHeight: chooserHeight
-            )
+            HStack(spacing: 8) {
+                Image(systemName: selectedMetric?.symbol ?? selectedMetric?.kind.inspectorSymbol ?? "questionmark")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(IslandChrome.secondaryText)
+                    .frame(width: 20)
+                Text(selectedMetric?.name ?? "Choose data")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(IslandChrome.text)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 9)
+            .frame(maxWidth: .infinity, minHeight: chooserHeight, alignment: .leading)
+            .contentShape(Rectangle())
         }
         .menuStyle(.borderlessButton)
+        .menuIndicator(.visible)
         .frame(maxWidth: .infinity)
-        .settingsPopupChrome(compact: true)
+        .settingsPopupChrome()
         .disabled(candidates.isEmpty)
-        .help(selectedMetric.map { metricDesignDescription($0, index: index) } ?? "Choose a metric")
+        .accessibilityLabel("\(metricSlotName(index: index)) data")
+        .help(selectedMetric.map { "\($0.name) · \(metricDesignDescription($0, index: index))" } ?? "Choose a metric")
+    }
+
+    private func metricOption(
+        _ candidate: ComplicationMetricDescriptor,
+        index: Int,
+        selectedID: String?,
+        grouped: Bool = false
+    ) -> some View {
+        let name = grouped ? HarnaisGlance.rowLabel(sourceID: complication.sourceID, metricID: candidate.id, metricName: candidate.name) : candidate.name
+        let assignedElsewhere = isMetricAssigned(candidate.id, excluding: index)
+        return Button {
+            metric(index: index).wrappedValue = candidate.id
+        } label: {
+            Label(
+                assignedElsewhere ? "\(name) (in use)" : name,
+                systemImage: candidate.id == selectedID
+                    ? "checkmark"
+                    : candidate.symbol ?? candidate.kind.inspectorSymbol
+            )
+        }
+        .disabled(assignedElsewhere)
+    }
+
+    /// Use the source's account groups rather than guessing from display names.
+    /// Every compatible metric appears once, including ungrouped metrics.
+    private func metricMenuGroups(
+        candidates: [ComplicationMetricDescriptor]
+    ) -> [(title: String, metrics: [ComplicationMetricDescriptor])] {
+        guard let sourceGroups = runtime.snapshot(sourceID: complication.sourceID)?.quotaGroups,
+              !sourceGroups.isEmpty
+        else { return [] }
+        var assigned = Set<String>()
+        var result: [(title: String, metrics: [ComplicationMetricDescriptor])] = []
+        for group in sourceGroups {
+            let ids = Set(group.metricIDs)
+            let metrics = candidates.filter { ids.contains($0.id) && !assigned.contains($0.id) }
+            guard !metrics.isEmpty else { continue }
+            assigned.formUnion(metrics.map(\.id))
+            result.append((UsageQuota.privacySafeTitle(group.title) ?? "Account", metrics))
+        }
+        let remaining = candidates.filter { !assigned.contains($0.id) }
+        if !remaining.isEmpty { result.append(("Other data", remaining)) }
+        return result
+    }
+
+    private func colorTitle(index: Int) -> String {
+        switch resolvedTint(index: index).style {
+        case .source: "Source accent"
+        case .monochrome: "Monochrome"
+        case .custom: "Custom"
+        }
     }
 
     @ViewBuilder
@@ -281,44 +335,44 @@ struct ComplicationDataEditor: View {
             ZStack {
                 dataRingGlyph(
                     diameter: 29,
-                    color: index == 0 ? slotDisplayColor(index: index) : Color.white.opacity(0.16)
+                    color: index == 0 ? slotDisplayColor(index: index) : IslandChrome.track
                 )
                 dataRingGlyph(
                     diameter: 19,
-                    color: index == 1 ? slotDisplayColor(index: index) : Color.white.opacity(0.16)
+                    color: index == 1 ? slotDisplayColor(index: index) : IslandChrome.track
                 )
             }
         case .summary:
             HStack(spacing: 3) {
                 ForEach(0..<3, id: \.self) { item in
                     Circle()
-                        .fill(item == index ? slotDisplayColor(index: index) : Color.white.opacity(0.14))
+                        .fill(item == index ? slotDisplayColor(index: index) : IslandChrome.track)
                         .frame(width: 7, height: 7)
                 }
             }
             .frame(width: 30, height: 30)
-            .background(IslandChrome.fieldFill, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .background(IslandChrome.fieldFill, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         case .cluster:
             ZStack {
                 dataRingGlyph(
                     diameter: 29,
-                    color: index == 0 ? slotDisplayColor(index: index) : Color.white.opacity(0.14)
+                    color: index == 0 ? slotDisplayColor(index: index) : IslandChrome.track
                 )
                 dataRingGlyph(
                     diameter: 21,
-                    color: index == 1 ? slotDisplayColor(index: index) : Color.white.opacity(0.14)
+                    color: index == 1 ? slotDisplayColor(index: index) : IslandChrome.track
                 )
                 dataRingGlyph(
                     diameter: 13,
-                    color: index == 2 ? slotDisplayColor(index: index) : Color.white.opacity(0.14)
+                    color: index == 2 ? slotDisplayColor(index: index) : IslandChrome.track
                 )
             }
         default:
             Image(systemName: complication.family.inspectorSymbol)
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(IslandChrome.text)
                 .frame(width: 30, height: 30)
-                .background(slotDisplayColor(index: index).opacity(0.16), in: Circle())
+                .background(IslandChrome.track, in: Circle())
         }
     }
 
@@ -347,19 +401,6 @@ struct ComplicationDataEditor: View {
         }
     }
 
-    private func shortMetricSlotName(index: Int) -> String {
-        switch complication.family {
-        case .dualRing: index == 0 ? "Outer" : "Inner"
-        case .cluster:
-            switch index {
-            case 0: "Outer"
-            case 1: "Middle"
-            default: "Inner"
-            }
-        default: metricSlotName(index: index)
-        }
-    }
-
     private func metricSlotExplanation(index: Int) -> String {
         switch complication.family {
         case .dualRing:
@@ -385,7 +426,7 @@ struct ComplicationDataEditor: View {
 
     private func metricPreviewValue(index: Int) -> String? {
         guard values.indices.contains(index) else { return nil }
-        return String(values[index].displayText.prefix(12))
+        return values[index].displayText
     }
 
     private func isMetricAssigned(_ metricID: String, excluding index: Int) -> Bool {
@@ -402,6 +443,10 @@ struct ComplicationDataEditor: View {
             let secondMode = config.valueMode(at: 1)
             config.setValueMode(secondMode, at: 0)
             config.setValueMode(firstMode, at: 1)
+            while config.slotTints.count < 2 {
+                config.slotTints.append(config.tint)
+            }
+            config.slotTints.swapAt(0, 1)
             config.recipeID = nil
         }
     }
@@ -416,8 +461,8 @@ struct ComplicationDataEditor: View {
         let tint = resolvedTint(index: index)
         return switch tint.style {
         case .source: sourceAccent
-        case .monochrome: Color.white.opacity(0.82)
-        case .custom: Color(hex: tint.hex) ?? .white
+        case .monochrome: IslandChrome.text
+        case .custom: Color(hex: tint.hex) ?? IslandChrome.text
         }
     }
 
@@ -524,7 +569,8 @@ struct ComplicationDataEditor: View {
     private var sourceAccent: Color {
         ComplicationSourceStyle.accent(
             sourceID: complication.sourceID,
-            descriptor: descriptor
+            descriptor: descriptor,
+            metricIDs: complication.metricIDs
         )
     }
 }

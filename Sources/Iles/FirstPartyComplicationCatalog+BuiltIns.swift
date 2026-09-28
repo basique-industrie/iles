@@ -93,75 +93,6 @@ extension FirstPartyComplicationCatalog {
         ),
     ]
 
-    static let batteryRecipes: [ComplicationRecipe] = [
-        recipe(
-            id: "system.battery.charge-ring",
-            name: "Battery Charge",
-            summary: "Current Mac battery charge as a glanceable ring.",
-            question: "How much battery remains?",
-            sourceID: "system.battery",
-            category: .mac,
-            tags: ["battery", "charge", "power"],
-            family: .ring,
-            metricIDs: ["level"],
-            rank: 100,
-            featured: true
-        ),
-        recipe(
-            id: "system.battery.power-state",
-            name: "Power State",
-            summary: "Whether the Mac is charging, plugged in, or on battery.",
-            question: "Where is my Mac getting power?",
-            sourceID: "system.battery",
-            category: .mac,
-            tags: ["battery", "charging", "plugged", "power"],
-            family: .status,
-            metricIDs: ["power"],
-            labelStyle: .compact,
-            rank: 97
-        ),
-        recipe(
-            id: "system.battery.time-remaining",
-            name: "Battery Time Remaining",
-            summary: "The estimated time until the battery empties or finishes charging.",
-            question: "How long will this charge last?",
-            sourceID: "system.battery",
-            category: .mac,
-            tags: ["battery", "remaining", "duration"],
-            family: .countdown,
-            metricIDs: ["remaining"],
-            labelStyle: .compact,
-            rank: 96,
-            featured: true
-        ),
-        recipe(
-            id: "system.battery.health",
-            name: "Battery Health",
-            summary: "The battery condition reported by macOS.",
-            question: "Is my battery healthy?",
-            sourceID: "system.battery",
-            category: .mac,
-            tags: ["battery", "health", "condition"],
-            family: .status,
-            metricIDs: ["health"],
-            labelStyle: .compact,
-            rank: 90
-        ),
-        recipe(
-            id: "system.battery.overview",
-            name: "Battery Overview",
-            summary: "Charge, power source, and battery health together.",
-            question: "What is the overall state of my battery?",
-            sourceID: "system.battery",
-            category: .mac,
-            tags: ["battery", "overview", "summary"],
-            family: .summary,
-            metricIDs: ["level", "power", "health"],
-            labelStyle: .compact,
-            rank: 95
-        ),
-    ]
-
     static let sessionRecipes: [ComplicationRecipe] = [
         recipe(
             id: "session.claude.state",
@@ -314,4 +245,73 @@ extension FirstPartyComplicationCatalog {
         recipe(id: "services.endpoint.failures", name: "Consecutive Failures", summary: "Checks that have failed since the last successful response.", question: "How many checks have failed in a row?", sourceID: "services.endpoint", category: .services, tags: ["service", "failures", "errors", "count"], family: .value, metricIDs: ["failures"], labelStyle: .value, rank: 93),
         recipe(id: "services.endpoint.overview", name: "Service Overview", summary: "Status, exact latency, and recent-check availability together.", question: "What is the overall health of this service?", sourceID: "services.endpoint", category: .services, tags: ["service", "health", "overview", "summary"], family: .summary, metricIDs: ["status", "latencyValue", "availability"], labelStyle: .compact, rank: 99, featured: true),
     ]
+    static let batteryRecipes: [ComplicationRecipe] = [
+        recipe(
+            id: "system.battery.charge-ring",
+            name: "Battery Charge",
+            summary: "Current Mac battery charge as a glanceable ring.",
+            question: "How much battery remains?",
+            sourceID: "system.battery",
+            category: .mac,
+            tags: ["battery", "charge", "power"],
+            family: .ring,
+            metricIDs: ["level"],
+            rank: 100,
+            featured: true
+        ),
+        recipe(
+            id: "system.battery.power-state",
+            name: "Power State",
+            summary: "Whether the Mac is charging, plugged in, or on battery.",
+            question: "Where is my Mac getting power?",
+            sourceID: "system.battery",
+            category: .mac,
+            tags: ["battery", "charging", "plugged", "power"],
+            family: .status,
+            metricIDs: ["power"],
+            labelStyle: .compact,
+            rank: 97
+        ),
+        recipe(
+            id: "system.battery.time-remaining",
+            name: "Battery Time Remaining",
+            summary: "The estimated time until the battery empties or finishes charging.",
+            question: "How long will this charge last?",
+            sourceID: "system.battery",
+            category: .mac,
+            tags: ["battery", "remaining", "duration"],
+            family: .countdown,
+            metricIDs: ["remaining"],
+            labelStyle: .compact,
+            rank: 96,
+            featured: true
+        ),
+        recipe(
+            id: "system.battery.health",
+            name: "Battery Health",
+            summary: "The battery condition reported by macOS.",
+            question: "Is my battery healthy?",
+            sourceID: "system.battery",
+            category: .mac,
+            tags: ["battery", "health", "condition"],
+            family: .status,
+            metricIDs: ["health"],
+            labelStyle: .compact,
+            rank: 90
+        ),
+        recipe(
+            id: "system.battery.overview",
+            name: "Battery Overview",
+            summary: "Charge, power source, and battery health together.",
+            question: "What is the overall state of my battery?",
+            sourceID: "system.battery",
+            category: .mac,
+            tags: ["battery", "overview", "summary"],
+            family: .summary,
+            metricIDs: ["level", "power", "health"],
+            labelStyle: .compact,
+            rank: 95
+        ),
+    ]
+
 }

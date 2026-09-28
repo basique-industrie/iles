@@ -12,10 +12,14 @@ final class IslandWindowCoordinator {
     private var hosts: [UUID: ScaleAwareHostingView<IslandView>] = [:]
     private var hostMaxHeights: [UUID: CGFloat] = [:]
     private let detailPanel: FloatingPanel
+    private var detailWasPinned = false
+    private var detailTransitionTask: Task<Void, Never>?
+    private var detailTargetFrame: NSRect?
     private var detailHost: ScaleAwareHostingView<ComplicationDetailView>?
     private var frames: [UUID: NSRect] = [:]
     private var screenObserver: NSObjectProtocol?
     private var clickMonitor: Any?
+    private var localClickMonitor: Any?
     private var moveMonitor: Any?
     private var syncTask: Task<Void, Never>?
     private var placementSyncTask: Task<Void, Never>?
@@ -34,8 +38,7 @@ final class IslandWindowCoordinator {
     init(runtime: IslandRuntime) {
         self.runtime = runtime
         detailPanel = FloatingPanel(
-            size: NSSize(width: IslandMetrics.providerWindowWidth, height: IslandMetrics.providerWindowHeight),
-            animates: true
+            size: NSSize(width: IslandMetrics.providerWindowWidth, height: IslandMetrics.providerWindowHeight)
         )
         detailPanel.hasShadow = false
         detailPanel.ignoresMouseEvents = false
@@ -79,7 +82,7 @@ final class IslandWindowCoordinator {
         }
         removeClickMonitor()
         removeMoveMonitor()
-        detailPanel.orderOut(nil)
+        hideDetail()
         if let hintObserver {
             NotificationCenter.default.removeObserver(hintObserver)
             self.hintObserver = nil
@@ -108,6 +111,8 @@ final class IslandWindowCoordinator {
             // which detail panel is shown.
             _ = runtime.workspaceStore.workspace
             _ = runtime.selection
+            _ = runtime.isWindowPinned
+            _ = runtime.provider(id: HarnaisWeeklyStarter.sourceID)?.snapshot?.hiddenQuotaTypes
         } onChange: { [weak self] in
             Task { @MainActor in
                 guard let self else { return }
@@ -199,7 +204,7 @@ final class IslandWindowCoordinator {
             let heightChanged = previous.map { abs($0.height - frame.height) > 0.5 } ?? false
             if frameChanged, animated, heightChanged, panel.isVisible, draggingIslandID != island.id {
                 NSAnimationContext.runAnimationGroup { context in
-                    context.duration = 0.16
+                    context.duration = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : 0.16
                     context.allowsImplicitAnimation = true
                     panel.animator().setFrame(frame, display: true)
                 }
@@ -213,7 +218,7 @@ final class IslandWindowCoordinator {
     private func panel(for island: IslandConfiguration, maxHeight: CGFloat) -> FloatingPanel {
         if let panel = panels[island.id] { return panel }
         let height = min(
-            IslandMetrics.height(forProviderCount: island.visibleComplications.count),
+            IslandMetrics.height(forProviderCount: runtime.visibleComplications(on: island).count),
             maxHeight
         )
         let panel = FloatingPanel(size: NSSize(width: IslandMetrics.width, height: height))
@@ -327,7 +332,7 @@ final class IslandWindowCoordinator {
             let maxHeight = maximumHeight(for: screen)
             let capacity = IslandMetrics.maxProviderCount(forHeight: maxHeight)
             let height = min(
-                IslandMetrics.height(forProviderCount: min(island.visibleComplications.count, capacity)),
+                IslandMetrics.height(forProviderCount: min(runtime.visibleComplications(on: island).count, capacity)),
                 maxHeight
             )
             let key = LayoutKey(screenNumber: screenIdentifier(screen), edge: island.placement.edge)
@@ -368,21 +373,22 @@ final class IslandWindowCoordinator {
 
     private func maximumHeight(for screen: NSScreen?) -> CGFloat {
         guard let screen else { return 900 }
-        return max(IslandMetrics.joinDepth * 2, screen.visibleFrame.height - IslandMetrics.topGap - 16)
+        return IslandMetrics.maximumHeight(visibleFrameHeight: screen.visibleFrame.height)
     }
 
     private func syncDetail() {
         guard let selection = runtime.selection,
               let complication = runtime.selectedComplication,
+              !runtime.isHiddenBySource(complication),
               let island = runtime.selectedIsland,
               let islandFrame = frames[selection.islandID]
         else {
-            detailPanel.orderOut(nil)
-            removeClickMonitor()
+            hideDetail()
             return
         }
 
-        let detailFrame = popoverFrame(island: island, islandFrame: islandFrame, complicationID: complication.id)
+        let detailFrame = popoverFrame(island: island, islandFrame: islandFrame, complicationID: complication.id,
+                                       height: ComplicationDetailView.preferredHeight(runtime: runtime, complication: complication))
         let pointerY = pointerY(
             island: island,
             islandFrame: islandFrame,
@@ -405,9 +411,81 @@ final class IslandWindowCoordinator {
             detailPanel.contentView = host
             detailHost = host
         }
-        detailPanel.setFrame(detailFrame, display: true)
-        detailPanel.orderFrontRegardless()
+        positionDetail(at: detailFrame, edge: island.placement.edge)
+        if runtime.isWindowPinned && !detailWasPinned {
+            detailPanel.makeKeyAndOrderFront(nil)
+        } else {
+            detailPanel.orderFrontRegardless()
+        }
+        detailWasPinned = runtime.isWindowPinned
         installClickMonitor()
+    }
+
+    /// A short, cancellable transition keeps the card attached to the hovered
+    /// row. Each new target starts at the currently displayed position, never
+    /// at an obsolete destination from an earlier hover.
+    private func positionDetail(at target: NSRect, edge: IslandEdge) {
+        let entering = !detailPanel.isVisible
+        let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        guard entering || detailTargetFrame != target || reduceMotion else { return }
+        detailTransitionTask?.cancel()
+        detailTransitionTask = nil
+        detailTargetFrame = target
+
+        guard !reduceMotion else {
+            detailPanel.alphaValue = 1
+            detailPanel.setFrame(target, display: true)
+            return
+        }
+
+        var start = detailPanel.frame
+        // Resize immediately so the text reflows once, rather than on every
+        // animation frame. Only the card's position and entrance opacity move.
+        start.size = target.size
+        if entering {
+            start.origin = target.origin
+            start.origin.x += edge == .trailing ? 4 : -4
+            detailPanel.alphaValue = 0
+        }
+        detailPanel.setFrame(start, display: true)
+        let initialAlpha = detailPanel.alphaValue
+        let duration = entering ? 0.14 : 0.12
+        let startedAt = ProcessInfo.processInfo.systemUptime
+        detailTransitionTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                guard let self else { return }
+                let elapsed = ProcessInfo.processInfo.systemUptime - startedAt
+                let fraction = min(elapsed / duration, 1)
+                let eased = CGFloat(1 - pow(1 - fraction, 3))
+                let noMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+                if fraction >= 1 || noMotion {
+                    self.detailPanel.setFrame(target, display: true)
+                    self.detailPanel.alphaValue = 1
+                    self.detailTransitionTask = nil
+                    return
+                }
+                self.detailPanel.setFrameOrigin(NSPoint(
+                    x: start.minX + (target.minX - start.minX) * eased,
+                    y: start.minY + (target.minY - start.minY) * eased
+                ))
+                self.detailPanel.alphaValue = initialAlpha + (1 - initialAlpha) * eased
+                do {
+                    try await Task.sleep(for: .milliseconds(16))
+                } catch {
+                    return
+                }
+            }
+        }
+    }
+
+    private func hideDetail() {
+        detailTransitionTask?.cancel()
+        detailTransitionTask = nil
+        detailTargetFrame = nil
+        detailPanel.orderOut(nil)
+        detailPanel.alphaValue = 1
+        detailWasPinned = false
+        removeClickMonitor()
     }
 
     private func selectedSlotCenterY(
@@ -415,7 +493,7 @@ final class IslandWindowCoordinator {
         islandFrame: NSRect,
         complicationID: UUID
     ) -> CGFloat {
-        guard let index = island.visibleComplications.firstIndex(where: { $0.id == complicationID }) else {
+        guard let index = runtime.visibleComplications(on: island).firstIndex(where: { $0.id == complicationID }) else {
             return islandFrame.midY
         }
         let islandY = IslandMetrics.ringCenterY(index: index)
@@ -425,13 +503,14 @@ final class IslandWindowCoordinator {
     private func popoverFrame(
         island: IslandConfiguration,
         islandFrame: NSRect,
-        complicationID: UUID
+        complicationID: UUID,
+        height: CGFloat
     ) -> NSRect {
         let center = selectedSlotCenterY(island: island, islandFrame: islandFrame, complicationID: complicationID)
-        var y = center - IslandMetrics.providerWindowHeight / 2
+        var y = center - height / 2
         if let screen = panels[island.id]?.screen ?? screen(for: island.placement.display) {
             let minY = screen.visibleFrame.minY + 12
-            let maxY = screen.visibleFrame.maxY - IslandMetrics.providerWindowHeight - 12
+            let maxY = screen.visibleFrame.maxY - height - 12
             y = min(max(y, minY), max(minY, maxY))
         }
         let x: CGFloat
@@ -441,7 +520,7 @@ final class IslandWindowCoordinator {
         case .leading:
             x = islandFrame.maxX + IslandMetrics.providerWindowGap
         }
-        return NSRect(x: x, y: y, width: IslandMetrics.providerWindowWidth, height: IslandMetrics.providerWindowHeight)
+        return NSRect(x: x, y: y, width: IslandMetrics.providerWindowWidth, height: height)
     }
 
     private func pointerY(
@@ -481,9 +560,17 @@ final class IslandWindowCoordinator {
         clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             Task { @MainActor in self?.dismissIfClickOutside() }
         }
+        localClickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            self?.dismissIfClickOutside()
+            return event
+        }
     }
 
     private func removeClickMonitor() {
+        if let localClickMonitor {
+            NSEvent.removeMonitor(localClickMonitor)
+            self.localClickMonitor = nil
+        }
         if let clickMonitor {
             NSEvent.removeMonitor(clickMonitor)
             self.clickMonitor = nil
@@ -497,7 +584,7 @@ final class IslandWindowCoordinator {
             return
         }
         runtime.dismissWindow()
-        detailPanel.orderOut(nil)
+        hideDetail()
     }
 
     private func installMoveMonitor() {
@@ -532,7 +619,7 @@ final class IslandWindowCoordinator {
             else { return false }
             draggingIslandID = id
             runtime.dismissWindow()
-            detailPanel.orderOut(nil)
+            hideDetail()
             dragStartMouseY = NSEvent.mouseLocation.y
             dragStartGap = screen.visibleFrame.maxY - frame.maxY
             dragCurrentGap = dragStartGap

@@ -8,14 +8,8 @@ private enum ComplicationEditorStep: String, CaseIterable {
     case data
     case finish
 
-    var title: String { rawValue.capitalized }
-
-    var symbol: String {
-        switch self {
-        case .style: "square.grid.2x2"
-        case .data: "circle.hexagongrid"
-        case .finish: "checkmark"
-        }
+    var title: String {
+        switch self { case .style: "Appearance"; case .data: "Data"; case .finish: "Behavior" }
     }
 }
 
@@ -65,7 +59,7 @@ struct ComplicationInspector: View {
 
     var body: some View {
         HStack {
-            PageTitle(title: "Complication")
+            PageTitle(title: "Widget")
             Spacer()
             Menu {
                 Button {
@@ -112,9 +106,12 @@ struct ComplicationInspector: View {
         IslandSegmentBar(
             items: ComplicationEditorStep.allCases,
             selection: $editorStep,
-            title: \.title,
-            symbol: \.symbol
+            title: \.title
         )
+
+        Text("Changes apply immediately.")
+            .font(.system(size: 11))
+            .foregroundStyle(IslandChrome.secondaryText)
 
         Group {
             switch editorStep {
@@ -123,13 +120,13 @@ struct ComplicationInspector: View {
             case .finish: finishStep
             }
         }
-        .transition(.opacity.combined(with: .move(edge: .trailing)))
+        .transition(.opacity)
     }
 
     private var styleStep: some View {
         SettingsGroup(
-            title: "Style",
-            subtitle: "Choose how this complication reads at a glance."
+            title: "Display style",
+            subtitle: "Choose how this data appears."
         ) {
             LazyVGrid(columns: styleColumns, spacing: 7) {
                 ForEach(supportedFamilies, id: \.self) { item in
@@ -151,12 +148,12 @@ struct ComplicationInspector: View {
 
     private var finishStep: some View {
         SettingsGroup(
-            title: "Label & Interaction",
+            title: "Label and click action",
             subtitle: "Choose the supporting label and click behavior."
         ) {
             valueLabelControl
-            FieldLabel(title: "On Click")
-            LazyVGrid(columns: optionColumns, spacing: 7) {
+            FieldLabel(title: "When clicked")
+            VStack(spacing: 7) {
                 ForEach(availableActions, id: \.self) { action in
                     actionButton(action)
                 }
@@ -167,16 +164,16 @@ struct ComplicationInspector: View {
     private var valueLabelControl: some View {
         HStack(spacing: 9) {
             Image(systemName: "textformat")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(.white)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(IslandChrome.text)
                 .frame(width: 26, height: 26)
-                .background(IslandChrome.selectedFill, in: Circle())
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Show Value Label")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.white)
-                Text("Display the glance value below the complication.")
-                    .font(.system(size: 9, weight: .medium))
+                .background(IslandChrome.track, in: Circle())
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Show value label")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(IslandChrome.text)
+                Text("Show the value below the widget.")
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(IslandChrome.tertiaryText)
                     .lineLimit(1)
             }
@@ -192,17 +189,14 @@ struct ComplicationInspector: View {
         )
         .overlay {
             RoundedRectangle(cornerRadius: IslandChrome.rowRadius, style: .continuous)
-                .strokeBorder(IslandChrome.hairline.opacity(0.72), lineWidth: 1)
+                .strokeBorder(IslandChrome.hairline, lineWidth: 1)
         }
     }
 
     private var livePreview: some View {
-        IslandCard(padding: 0) {
-            VStack(spacing: 0) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: IslandChrome.cardRadius, style: .continuous)
-                        .fill(Color.black.opacity(0.34))
-
+        IslandCard(padding: 12) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 14) {
                     ComplicationSlotView(
                         complication: complication,
                         descriptor: descriptor,
@@ -210,51 +204,64 @@ struct ComplicationInspector: View {
                         sourceError: usesFixture ? nil : snapshot?.errorDescription,
                         quality: usesFixture ? .cached : runtime.quality(for: complication),
                         trendDirection: usesFixture ? .unknown : runtime.trendDirection(for: complication),
-                        isSyncing: runtime.provider(id: complication.sourceID)?.isSyncing == true,
-                        renderScale: 1.8
+                        isSyncing: runtime.provider(id: complication.sourceID)?.isSyncing == true
                     )
+                    .frame(width: 56, height: 64)
+                    .background(IslandPalette.surface, in: RoundedRectangle(cornerRadius: 12))
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
-
-                    VStack {
-                        HStack {
-                            SectionLabel(title: usesFixture ? "Sample Preview" : "Live Preview")
-                            Spacer()
-                            Text(glanceValue)
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(IslandChrome.secondaryText)
-                                .monospacedDigit()
-                        }
-                        Spacer()
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(previewTitle)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(IslandChrome.text)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text(previewMetrics)
+                            .font(.system(size: 12))
+                            .foregroundStyle(IslandChrome.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text("\(previewStatus) · \(complication.family.displayName)")
+                            .font(.system(size: 11))
+                            .foregroundStyle(IslandChrome.secondaryText)
                     }
-                    .padding(11)
+                    Spacer(minLength: 0)
                 }
-                .frame(height: 126)
-                .clipped()
-
                 if let error = snapshot?.errorDescription {
                     SettingsHairline()
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(alignment: .top, spacing: 6) {
-                            Image(systemName: "exclamationmark.circle")
-                                .font(.system(size: 10, weight: .semibold))
-                            Text(error)
-                                .font(.system(size: 10, weight: .medium))
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        QuietButton(
-                            title: "Configure Source",
-                            symbol: "slider.horizontal.3",
-                            prominence: .primary
-                        ) {
-                            configureSource(complication.sourceID)
-                        }
+                    Text(error)
+                        .font(.system(size: 12))
+                        .foregroundStyle(IslandChrome.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                    QuietButton(title: "Configure source", symbol: "slider.horizontal.3") {
+                        configureSource(complication.sourceID)
                     }
-                    .foregroundStyle(IslandChrome.secondaryText)
-                    .padding(.horizontal, 11)
-                    .padding(.bottom, 11)
                 }
             }
+        }
+    }
+
+    private var previewTitle: String {
+        let brand = HarnaisGlance.resolvedBrand(sourceID: complication.sourceID,
+                                              metricIDs: complication.metricIDs, descriptor: descriptor)?.title
+        let account = HarnaisGlance.accountLabel(sourceID: complication.sourceID,
+                                                metricIDs: complication.metricIDs, descriptor: descriptor)
+        return [brand ?? descriptor?.name ?? "Widget", account].compactMap { $0 }.joined(separator: " · ")
+    }
+
+    private var previewMetrics: String {
+        complication.metricIDs.map { id in
+            HarnaisGlance.rowLabel(sourceID: complication.sourceID, metricID: id,
+                                  metricName: descriptor?.metricName(for: id) ?? ComplicationMetricDescriptor.fallbackName(for: id))
+        }.joined(separator: " · ")
+    }
+
+    private var previewStatus: String {
+        if usesFixture { return "Sample data" }
+        if runtime.provider(id: complication.sourceID)?.isSyncing == true { return "Updating…" }
+        switch runtime.quality(for: complication) {
+        case .live: return "Live preview"
+        case .cached: return "Saved reading"
+        case .stale: return "Last reading"
+        case .unavailable, .failed: return "No current data"
         }
     }
 
@@ -282,25 +289,21 @@ struct ComplicationInspector: View {
                         reservesHiddenLabelSpace: false
                     )
                     .frame(width: 58, height: 44)
+                    .background(IslandPalette.surface, in: RoundedRectangle(cornerRadius: 10))
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
                     Text(item.displayName)
-                        .font(.system(size: 10, weight: selected ? .semibold : .medium))
-                        .foregroundStyle(selected ? Color.white : IslandChrome.secondaryText)
+                        .font(.system(size: 12, weight: selected ? .semibold : .medium))
+                        .foregroundStyle(selected ? IslandChrome.text : IslandChrome.secondaryText)
                         .lineLimit(1)
                 }
                 .frame(maxWidth: .infinity, minHeight: 70)
 
                 if selected {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(IslandChrome.accent)
                         .padding(7)
-                } else if item == recommendedStyleFamily {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(IslandChrome.secondaryText)
-                        .padding(8)
                 }
             }
             .background(
@@ -325,26 +328,31 @@ struct ComplicationInspector: View {
         return Button {
             tapAction.wrappedValue = item
         } label: {
-            HStack(spacing: 7) {
+            HStack(spacing: 8) {
                 Image(systemName: item.inspectorSymbol)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(IslandChrome.text)
                     .frame(width: 24, height: 24)
-                    .background(IslandChrome.selectedFill, in: Circle())
-                Text(item.displayName)
-                    .font(.system(size: 10, weight: selected ? .semibold : .medium))
-                    .foregroundStyle(selected ? Color.white : IslandChrome.secondaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
+                    .background(IslandChrome.track, in: Circle())
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(item.displayName)
+                        .font(.system(size: 12, weight: selected ? .semibold : .medium))
+                        .foregroundStyle(IslandChrome.text)
+                    Text(item.explanation)
+                        .font(.system(size: 11))
+                        .foregroundStyle(IslandChrome.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 Spacer(minLength: 0)
                 if selected {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(IslandChrome.accent)
                 }
             }
-            .padding(.horizontal, 9)
-            .frame(maxWidth: .infinity, minHeight: 44)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 9)
+            .frame(maxWidth: .infinity, minHeight: 48)
             .background(
                 selected ? IslandChrome.selectedFill : IslandChrome.fieldFill,
                 in: RoundedRectangle(cornerRadius: IslandChrome.fieldRadius, style: .continuous)
@@ -363,10 +371,6 @@ struct ComplicationInspector: View {
     }
 
     private var styleColumns: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: 7), count: 2)
-    }
-
-    private var optionColumns: [GridItem] {
         Array(repeating: GridItem(.flexible(), spacing: 7), count: 2)
     }
 
@@ -467,13 +471,6 @@ struct ComplicationInspector: View {
         }
     }
 
-    private var recommendedStyleFamily: ComplicationFamily {
-        guard let metricID = complication.metricIDs.first,
-              let metric = descriptor?.metrics.first(where: { $0.id == metricID })
-        else { return complication.family }
-        return metric.recommendedFamily()
-    }
-
     private func stylePreviewConfiguration(for family: ComplicationFamily) -> ComplicationConfiguration {
         let candidates = compatibleMetrics(for: family)
         let candidateIDs = Set(candidates.map(\.id))
@@ -508,11 +505,6 @@ struct ComplicationInspector: View {
                 || runtime.provider(id: complication.sourceID)?.dashboardURL != nil
                 || descriptor?.actionURL != nil
         }
-    }
-
-    private var glanceValue: String {
-        let value = values.first?.displayText ?? (snapshot?.errorDescription == nil ? "No data" : "Needs setup")
-        return String(value.prefix(14))
     }
 
     private static func preferredLabel(for family: ComplicationFamily) -> ComplicationLabelStyle {

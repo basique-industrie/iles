@@ -37,6 +37,10 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         let menu = NSMenu()
         menu.delegate = self
 
+        let overview = NSMenuItem(title: "Open Iles", action: #selector(showOverview), keyEquivalent: "o")
+        overview.target = self
+        menu.addItem(overview)
+
         let settings = NSMenuItem(
             title: "Settings…",
             action: #selector(showSettings),
@@ -83,8 +87,12 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         launchAtLoginItem.state = appDelegate.launchesAtLogin ? .on : .off
     }
 
+    @objc private func showOverview() {
+        appDelegate.showOverview()
+    }
+
     @objc private func showSettings() {
-        appDelegate.showSettings()
+        appDelegate.showGeneralSettings()
     }
 
     @objc private func refreshSources() {

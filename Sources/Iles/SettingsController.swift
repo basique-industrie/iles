@@ -34,9 +34,9 @@ final class SettingsController {
             window.title = AppIdentity.current.displayName
             window.level = .normal
             window.isOpaque = true
-            window.backgroundColor = IslandPalette.popoverNSColor
-            window.titlebarAppearsTransparent = false
-            window.appearance = NSAppearance(named: .darkAqua)
+            window.backgroundColor = IslandChrome.backgroundNSColor
+            window.titlebarAppearsTransparent = true
+            window.appearance = nil
             window.isReleasedWhenClosed = false
             window.hidesOnDeactivate = false
             window.hasShadow = true

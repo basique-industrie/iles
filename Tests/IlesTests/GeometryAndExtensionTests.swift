@@ -11,6 +11,20 @@ extension IlesSelfTests {
     static func runGeometryAndExtensionTests(_ test: TestHarness) async {
         // MARK: Geometry
 
+        let threeRowBounds = CGRect(x: 0, y: 0, width: IslandMetrics.width,
+                                    height: IslandMetrics.height(forProviderCount: 3))
+        let islandPath = IslandShape().path(in: threeRowBounds)
+        for index in 0..<3 {
+            test.expectEqual(IslandMetrics.ringCenterY(index: index), CGFloat(45 + index * 56),
+                             "detail pointers follow the center of each redesigned ring")
+            let rowEnd = IslandMetrics.topPadding + CGFloat(index) * (IslandMetrics.itemHeight + IslandMetrics.itemSpacing)
+                + IslandMetrics.itemHeight - 1
+            let inset = (IslandMetrics.width - IslandMetrics.textWidth) / 2
+            test.expect(islandPath.contains(CGPoint(x: inset, y: rowEnd)),
+                        "percentage labels stay inside the curved island at row \(index)")
+        }
+
+
         IslandMetrics.assertLayoutInvariants()
         test.expect(true, "layout invariants")
         test.expectEqual(
@@ -322,6 +336,79 @@ extension IlesSelfTests {
             test.expect(scanner.scan(directory: extensions).isEmpty, "extension bundles containing symlinks are rejected")
         } catch {
             test.expect(false, "extension fingerprint fixture is created: \(error)")
+        }
+
+        do {
+            let data = Data("""
+            {
+              "quotas": [
+                {
+                  "type": "time:Claude · work 5h",
+                  "percentRemaining": 62,
+                  "group": "Claude · work",
+                  "compactTitle": "5h"
+                }
+              ]
+            }
+            """.utf8)
+            let decoded = try SectionData.decode(from: data, type: .quotaGrid, providerId: "harnais")
+            if case .quotas(let quotas) = decoded, let quota = quotas.first {
+                test.expectEqual(quota.group, "Claude · work", "quotaGrid JSON preserves group")
+                test.expectEqual(quota.quotaType, .timeLimit("Claude · work 5h"), "quotaGrid type keys do not double the time prefix")
+                test.expectEqual(quota.compactTitle, "5h", "quotaGrid JSON preserves compactTitle")
+            } else {
+                test.expect(false, "quotaGrid JSON decodes into quotas")
+            }
+        } catch {
+            test.expect(false, "quotaGrid group decode: \(error)")
+        }
+
+        do {
+            // Harnais probe v1.1 contract: quotas + capturedAt/stale/refreshTriggered/harnesses.
+            // SectionData must tolerate the extra keys (RawQuotaOutput.quotas optional).
+            let data = Data("""
+            {
+              "quotas": [
+                {
+                  "type": "session",
+                  "percentRemaining": 42,
+                  "group": "Claude · Work",
+                  "compactTitle": "Session"
+                }
+              ],
+              "capturedAt": "2026-09-18T00:00:00Z",
+              "stale": false,
+              "refreshTriggered": false,
+              "harnesses": {
+                "connections": [],
+                "lastApply": {"at": null, "names": [], "files": null, "hiddenRings": []}
+              }
+            }
+            """.utf8)
+            let decoded = try SectionData.decode(from: data, type: .quotaGrid, providerId: "harnais")
+            if case .quotas(let quotas) = decoded {
+                test.expectEqual(quotas.count, 1, "harnais probe v1.1 decodes despite extra keys")
+            } else {
+                test.expect(false, "harnais probe v1.1 decodes into quotas")
+            }
+        } catch {
+            test.expect(false, "harnais probe v1.1 decode: \(error)")
+        }
+
+        do {
+            let encoder = JSONEncoder()
+            let decoder = JSONDecoder()
+            let encoded = try encoder.encode(SourceSnapshot(sourceID: "claude", values: [:]))
+            guard var object = try JSONSerialization.jsonObject(with: encoded) as? [String: Any] else {
+                test.expect(false, "SourceSnapshot encodes as a JSON object")
+                return
+            }
+            object.removeValue(forKey: "quotaGroups")
+            let stripped = try JSONSerialization.data(withJSONObject: object)
+            let legacy = try decoder.decode(SourceSnapshot.self, from: stripped)
+            test.expect(legacy.quotaGroups == nil, "legacy snapshots without quotaGroups still decode")
+        } catch {
+            test.expect(false, "legacy SourceSnapshot decode: \(error)")
         }
 
     }

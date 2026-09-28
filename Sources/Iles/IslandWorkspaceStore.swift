@@ -7,6 +7,7 @@ struct ComplicationRemoval: Sendable {
     let islandID: UUID
     let complication: ComplicationConfiguration
     let index: Int
+    let wasFollowingHarnaisAccounts: Bool
 }
 
 struct IslandRemoval: Sendable {
@@ -93,6 +94,7 @@ final class IslandWorkspaceStore {
         let copy = IslandConfiguration(
             name: uniqueName(base: "\(source.name) Copy"),
             isVisible: source.isVisible,
+            followsHarnaisAccounts: source.followsHarnaisAccounts == true,
             placement: placement,
             complications: source.complications.map {
                 ComplicationConfiguration(
@@ -162,7 +164,8 @@ final class IslandWorkspaceStore {
         labelStyle: ComplicationLabelStyle? = nil,
         recipeID: String? = nil,
         tint: ComplicationTint = .source,
-        tapAction: ComplicationAction = .showDetails
+        tapAction: ComplicationAction = .showDetails,
+        slotValueModes: [ComplicationValueMode]? = nil
     ) -> UUID? {
         guard let index = workspace.islands.firstIndex(where: { $0.id == islandID }) else { return nil }
         let complication = ComplicationConfiguration(
@@ -172,6 +175,12 @@ final class IslandWorkspaceStore {
             family: family,
             labelStyle: labelStyle ?? (family == .status ? .compact : .percentage),
             tint: tint,
+            slotValueModes: slotValueModes
+                ?? ComplicationValueMode.remainingDefaults(
+                    sourceID: sourceID,
+                    metricIDs: metricIDs,
+                    family: family
+                ),
             tapAction: tapAction
         )
         workspace.islands[index].complications.append(complication)
@@ -179,6 +188,44 @@ final class IslandWorkspaceStore {
         selectedComplicationID = complication.id
         persist()
         return complication.id
+    }
+
+    func addComplications(
+        to islandID: UUID,
+        recipes: [ComplicationRecipe],
+        select: Bool = false,
+        insertionIndex: ((ComplicationRecipe, IslandConfiguration) -> Int)? = nil
+    ) {
+        guard let index = workspace.islands.firstIndex(where: { $0.id == islandID }),
+              !recipes.isEmpty
+        else { return }
+        for recipe in recipes {
+            let complication = ComplicationConfiguration(
+                recipeID: recipe.id,
+                sourceID: recipe.sourceID,
+                metricIDs: recipe.metricIDs,
+                family: recipe.family,
+                labelStyle: recipe.labelStyle,
+                tint: recipe.tint,
+                slotValueModes: ComplicationValueMode.remainingDefaults(
+                    sourceID: recipe.sourceID,
+                    metricIDs: recipe.metricIDs,
+                    family: recipe.family
+                ),
+                tapAction: recipe.tapAction
+            )
+            let count = workspace.islands[index].complications.count
+            let at = insertionIndex?(recipe, workspace.islands[index]) ?? count
+            workspace.islands[index].complications.insert(
+                complication,
+                at: min(max(at, 0), count)
+            )
+        }
+        if select, let last = workspace.islands[index].complications.last {
+            selectedIslandID = islandID
+            selectedComplicationID = last.id
+        }
+        persist()
     }
 
     func duplicateComplication(_ id: UUID, in islandID: UUID) {
@@ -208,13 +255,20 @@ final class IslandWorkspaceStore {
         guard let islandIndex = workspace.islands.firstIndex(where: { $0.id == islandID }),
               let index = workspace.islands[islandIndex].complications.firstIndex(where: { $0.id == id })
         else { return nil }
+        let wasFollowing = workspace.islands[islandIndex].followsHarnaisAccounts == true
         let removed = workspace.islands[islandIndex].complications.remove(at: index)
+        if removed.sourceID == HarnaisWeeklyStarter.sourceID {
+            // A manually reduced collection becomes a custom island. Otherwise
+            // reconciliation would immediately recreate the widget just deleted.
+            workspace.islands[islandIndex].followsHarnaisAccounts = false
+        }
         if selectedComplicationID == id {
             let items = workspace.islands[islandIndex].complications
             selectedComplicationID = items.isEmpty ? nil : items[min(index, items.count - 1)].id
         }
         persist()
-        return ComplicationRemoval(islandID: islandID, complication: removed, index: index)
+        return ComplicationRemoval(islandID: islandID, complication: removed, index: index,
+                                   wasFollowingHarnaisAccounts: wasFollowing)
     }
 
     func restoreComplication(_ removal: ComplicationRemoval) {
@@ -223,6 +277,10 @@ final class IslandWorkspaceStore {
         else { return }
         let index = min(max(removal.index, 0), workspace.islands[islandIndex].complications.count)
         workspace.islands[islandIndex].complications.insert(removal.complication, at: index)
+        if removal.complication.sourceID == HarnaisWeeklyStarter.sourceID,
+           removal.wasFollowingHarnaisAccounts {
+            workspace.islands[islandIndex].followsHarnaisAccounts = true
+        }
         selectedIslandID = removal.islandID
         selectedComplicationID = removal.complication.id
         persist()
@@ -297,6 +355,7 @@ final class IslandWorkspaceStore {
                 copy.islands[index] = IslandConfiguration(
                     name: old.name,
                     isVisible: old.isVisible,
+                    followsHarnaisAccounts: old.followsHarnaisAccounts == true,
                     placement: old.placement,
                     complications: old.complications
                 )

@@ -21,6 +21,7 @@ public enum ProviderIdentity: String, Sendable, CaseIterable, Identifiable {
     case openCode = "opencode-go"
     case omp
     case grok
+    case harnais
 
     public var id: String { rawValue }
 
@@ -44,6 +45,48 @@ public enum ProviderIdentity: String, Sendable, CaseIterable, Identifiable {
         case .openCode: "OpenCode"
         case .omp: "Oh My Pi"
         case .grok: "Grok"
+        case .harnais: "Harnais"
         }
+    }
+
+    /// Claude, Codex, and Cursor accounts published through Harnais.
+    public static let harnaisUpstream: [ProviderIdentity] = [.claude, .codex, .cursor]
+
+    public static let harnaisUpstreamIDs: Set<String> = Set(harnaisUpstream.map(\.rawValue))
+
+    /// Maps a Harnais window onto the upstream provider it belongs to.
+    public static func mappedFromHarnais(
+        providerId: String,
+        group: String? = nil,
+        label: String? = nil
+    ) -> ProviderIdentity? {
+        if let identity = ProviderIdentity(rawValue: providerId),
+           harnaisUpstream.contains(identity) {
+            return identity
+        }
+        for candidate in [group, label].compactMap({ $0 }) {
+            if let identity = parseHarnaisLabel(candidate) {
+                return identity
+            }
+        }
+        return nil
+    }
+
+    private static func parseHarnaisLabel(_ text: String) -> ProviderIdentity? {
+        var remainder = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let colon = remainder.lastIndex(of: ":") {
+            remainder = String(remainder[remainder.index(after: colon)...])
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        let head = remainder
+            .split(whereSeparator: { $0 == "·" || $0.isWhitespace })
+            .first
+            .map { String($0).lowercased() } ?? ""
+        for identity in harnaisUpstream {
+            if head == identity.rawValue || head == identity.displayName.lowercased() {
+                return identity
+            }
+        }
+        return nil
     }
 }

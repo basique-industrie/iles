@@ -76,6 +76,14 @@ public final class JSONSettingsRepository:
         store.write(value: dismissed, key: "app.emptyWorkspaceHintDismissed")
     }
 
+    public func hideBuiltInAIWhenHarnais() -> Bool {
+        store.read(key: "app.hideBuiltInAIWhenHarnais") ?? false
+    }
+
+    public func setHideBuiltInAIWhenHarnais(_ enabled: Bool) {
+        store.write(value: enabled, key: "app.hideBuiltInAIWhenHarnais")
+    }
+
     // MARK: - ClaudeSettingsRepository
 
     public func claudeProbeMode() -> ClaudeProbeMode {
@@ -274,23 +282,16 @@ public final class JSONSettingsRepository:
         store.write(value: region.rawValue, key: "alibaba.region")
     }
 
-    public func alibabaCookieSource() -> AlibabaCookieSource {
-        guard let rawValue: String = store.read(key: "alibaba.cookieSource") else {
-            return .auto
-        }
-        return AlibabaCookieSource(rawValue: rawValue) ?? .auto
-    }
-
-    public func setAlibabaCookieSource(_ source: AlibabaCookieSource) {
-        store.write(value: source.rawValue, key: "alibaba.cookieSource")
-    }
-
     public func saveAlibabaManualCookie(_ cookie: String) {
         saveCredential(cookie, forKey: CredentialKey.alibabaManualCookie)
     }
 
     public func getAlibabaManualCookie() -> String? {
         secureCredentials.get(forKey: CredentialKey.alibabaManualCookie)
+    }
+
+    public func deleteAlibabaManualCookie() {
+        secureCredentials.delete(forKey: CredentialKey.alibabaManualCookie)
     }
 
     public func saveAlibabaApiKey(_ key: String) {

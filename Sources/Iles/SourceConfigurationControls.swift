@@ -41,15 +41,15 @@ struct SourceFocusControls: View {
             SettingsHairline()
             HStack {
                 Text("Daily goal")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(IslandChrome.secondaryText)
                 Spacer()
                 Text(CompactDurationFormatter.hoursMinutes(
                     TimeInterval(dailyGoal * 60),
                     includesZeroMinutes: false
                 ))
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(IslandChrome.text)
                     .monospacedDigit()
             }
             SettingsSlider(
@@ -61,6 +61,8 @@ struct SourceFocusControls: View {
                 source.setDailyGoal(minutes: Int(dailyGoal.rounded()))
                 didChange()
             }
+            .accessibilityLabel("Daily goal")
+            .accessibilityValue("\(Int(dailyGoal)) minutes")
         }
     }
 }
@@ -197,18 +199,19 @@ struct SourceGitHubControls: View {
             title: "Repository",
             subtitle: "Uses your existing GitHub CLI login; no token is stored."
         ) {
-            HStack(spacing: 7) {
-                HStack(spacing: 7) {
+            HStack(spacing: 8) {
+                HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(IslandChrome.tertiaryText)
                     TextField("Search or enter owner/repository", text: $query)
                         .textFieldStyle(.plain)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(IslandChrome.text)
                         .onSubmit(selectTypedRepository)
                 }
-                .padding(.horizontal, 9)
-                .frame(height: 32)
+                .padding(.horizontal, 10)
+                .frame(height: 28)
                 .background(
                     IslandChrome.fieldFill,
                     in: RoundedRectangle(cornerRadius: IslandChrome.fieldRadius, style: .continuous)
@@ -230,8 +233,8 @@ struct SourceGitHubControls: View {
 
             if let validationMessage {
                 Label(validationMessage, systemImage: "exclamationmark.circle")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Color.orange.opacity(0.9))
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(IslandChrome.error)
             }
 
             if source.repository != nil {
@@ -302,22 +305,22 @@ struct SourceGitHubControls: View {
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: listing.isPrivate ? "lock.fill" : "book.closed")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(IslandChrome.tertiaryText)
                     .frame(width: 14)
                 Text(listing.nameWithOwner)
-                    .font(.system(size: 12, weight: selected ? .semibold : .medium))
-                    .foregroundStyle(.white)
+                    .font(.system(size: 13, weight: selected ? .semibold : .medium))
+                    .foregroundStyle(IslandChrome.text)
                     .lineLimit(1)
                 Spacer(minLength: 6)
                 if selected {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(IslandChrome.text)
                 }
             }
-            .padding(.horizontal, 9)
-            .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
+            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity, minHeight: 36, alignment: .leading)
             .background(
                 selected ? IslandChrome.selectedFill : Color.clear,
                 in: RoundedRectangle(cornerRadius: IslandChrome.rowRadius, style: .continuous)
@@ -475,18 +478,18 @@ struct SourceExtensionTrustControls: View {
     }
 
     private func commandRow(_ command: String) -> some View {
-        HStack(spacing: 7) {
+        HStack(spacing: 8) {
             Image(systemName: "terminal")
-                .font(.system(size: 10, weight: .semibold))
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(IslandChrome.secondaryText)
             Text(command)
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .foregroundStyle(.white)
+                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                .foregroundStyle(IslandChrome.text)
                 .textSelection(.enabled)
             Spacer()
         }
         .padding(8)
-        .background(IslandChrome.fieldFill, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .background(IslandChrome.fieldFill, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
     @ViewBuilder

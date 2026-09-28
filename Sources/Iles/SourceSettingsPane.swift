@@ -1,6 +1,7 @@
 import AppKit
 import Domain
 import Infrastructure
+import IslandGeometry
 import SwiftUI
 
 private enum SourceListFilter: String, CaseIterable, Identifiable {
@@ -37,6 +38,7 @@ private enum SourceListFilter: String, CaseIterable, Identifiable {
 
 private enum SourceOperationalState: Equatable {
     case ready
+    case stale
     case syncing
     case needsSetup
     case unavailable
@@ -45,6 +47,7 @@ private enum SourceOperationalState: Equatable {
     var title: String {
         switch self {
         case .ready: "Ready"
+        case .stale: "Out of date"
         case .syncing: "Syncing"
         case .needsSetup: "Needs Setup"
         case .unavailable: "Unavailable"
@@ -55,44 +58,12 @@ private enum SourceOperationalState: Equatable {
     var symbol: String {
         switch self {
         case .ready: "circle.fill"
+        case .stale: "clock.badge.exclamationmark"
         case .syncing: "arrow.triangle.2.circlepath"
         case .needsSetup: "exclamationmark.circle.fill"
         case .unavailable: "xmark.circle.fill"
         case .available: "circle"
         }
-    }
-}
-
-private struct SourceStateAccessory: View {
-    let state: SourceOperationalState
-
-    @ViewBuilder
-    var body: some View {
-        switch state {
-        case .ready, .available:
-            EmptyView()
-        case .syncing:
-            statusBadge("Syncing", symbol: state.symbol)
-        case .needsSetup:
-            statusBadge("Setup", symbol: state.symbol)
-        case .unavailable:
-            statusBadge("Offline", symbol: state.symbol)
-        }
-    }
-
-    private func statusBadge(_ title: String, symbol: String) -> some View {
-        Label(title, systemImage: symbol)
-            .font(.system(size: 9, weight: .semibold))
-            .foregroundStyle(IslandChrome.secondaryText)
-            .padding(.horizontal, 6)
-            .frame(height: 20)
-            .background(IslandChrome.fieldFill, in: Capsule(style: .continuous))
-            .overlay {
-                Capsule(style: .continuous)
-                    .strokeBorder(IslandChrome.controlBorder.opacity(0.72), lineWidth: 1)
-            }
-            .accessibilityLabel(state.title)
-            .help(state.title)
     }
 }
 
@@ -115,7 +86,7 @@ struct SourceSettingsPane: View {
 
     private var filteredSources: [SourceListEntry] {
         let counts = sourceUsageCounts
-        return runtime.sourceRegistry.descriptors.enumerated().compactMap { index, source in
+        return runtime.catalogSources.enumerated().compactMap { index, source in
             let entry = SourceListEntry(
                 source: source,
                 usageCount: counts[source.id, default: 0],
@@ -150,26 +121,27 @@ struct SourceSettingsPane: View {
                             }
                         } label: {
                             Image(systemName: "plus")
-                                .font(.system(size: 11, weight: .semibold))
+                                .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(IslandChrome.secondaryText)
-                                .frame(width: 26, height: 26)
+                                .frame(width: 28, height: 28)
                         }
                         .menuStyle(.borderlessButton)
                         .menuIndicator(.hidden)
                         .accessibilityLabel("Add source")
                         .help("Add another Git, GitHub, or health source")
                     }
-                    HStack(spacing: 7) {
-                        HStack(spacing: 7) {
+                    HStack(spacing: 8) {
+                        HStack(spacing: 8) {
                             Image(systemName: "magnifyingglass")
-                                .font(.system(size: 11, weight: .semibold))
+                                .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(IslandChrome.tertiaryText)
                             TextField("Search sources", text: $search)
                                 .textFieldStyle(.plain)
-                                .font(.system(size: 12, weight: .medium))
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(IslandChrome.text)
                         }
-                        .padding(.horizontal, 9)
-                        .frame(height: 32)
+                        .padding(.horizontal, 10)
+                        .frame(height: 28)
                         .background(
                             IslandChrome.fieldFill,
                             in: RoundedRectangle(cornerRadius: IslandChrome.fieldRadius, style: .continuous)
@@ -190,8 +162,8 @@ struct SourceSettingsPane: View {
                         } label: {
                             Image(systemName: "line.3.horizontal.decrease.circle")
                                 .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .frame(width: 32, height: 32)
+                                .foregroundStyle(IslandChrome.text)
+                                .frame(width: 28, height: 28)
                                 .background(IslandChrome.fieldFill, in: RoundedRectangle(cornerRadius: IslandChrome.fieldRadius, style: .continuous))
                                 .overlay {
                                     RoundedRectangle(cornerRadius: IslandChrome.fieldRadius, style: .continuous)
@@ -221,7 +193,7 @@ struct SourceSettingsPane: View {
                     .padding(8)
                 }
             }
-            .frame(width: IslandChrome.sidebarWidth)
+            .frame(width: 260)
             .background(IslandChrome.sidebarFill)
 
             Rectangle().fill(IslandChrome.hairline).frame(width: 1)
@@ -229,66 +201,53 @@ struct SourceSettingsPane: View {
             sourceDetail
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
+        .onChange(of: runtime.catalogSources.map(\.id), initial: true) { _, ids in
+            guard !ids.contains(selectedSourceID) else { return }
+            selectedSourceID = runtime.catalogSources.first(where: { $0.kind == .usage })?.id
+                ?? ids.first ?? ""
+        }
     }
 
     private func sourceRow(_ entry: SourceListEntry) -> some View {
         let source = entry.source
         let selected = source.id == selectedSourceID
-        let count = entry.usageCount
         let state = entry.state
         return Button { selectedSourceID = source.id } label: {
-            HStack(spacing: 8) {
-                SourceMark(sourceID: source.id, descriptor: source, size: 13)
-                    .frame(width: 24, height: 24)
-                    .background(IslandChrome.fieldFill, in: Circle())
-                Text(source.name)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                Spacer()
-                HStack(spacing: 5) {
-                    if count > 0 {
-                        Text("\(count)×")
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(IslandChrome.secondaryText)
-                            .padding(.horizontal, 5)
-                            .frame(height: 18)
-                            .background(IslandChrome.fieldFill, in: Capsule(style: .continuous))
+            HStack(spacing: 10) {
+                SourceMark(sourceID: source.id, descriptor: source, size: 18, tint: .labelColor)
+                    .frame(width: 30, height: 30)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(source.name)
+                        .font(.system(size: 13, weight: selected ? .semibold : .medium))
+                        .foregroundStyle(IslandChrome.text)
+                        .lineLimit(2)
+                    HStack(spacing: 4) {
+                        Text(state.title)
+                        if entry.usageCount > 0 { Text("· \(entry.usageCount) widgets") }
                     }
-                    SourceStateAccessory(state: state)
+                    .font(.system(size: 11))
+                    .foregroundStyle(state == .stale || state == .needsSetup ? IslandChrome.warning : IslandChrome.secondaryText)
                 }
+                Spacer(minLength: 0)
             }
-            .padding(.horizontal, 7)
-            .padding(.vertical, 5)
-            .frame(maxWidth: .infinity, minHeight: 36, alignment: .leading)
-            .background(
-                selected
-                    ? IslandChrome.selectedFill
-                    : Color.clear,
-                in: RoundedRectangle(cornerRadius: 8, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(selected ? IslandChrome.selectionBorder : Color.clear, lineWidth: 1)
-            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
+            .background(selected ? IslandChrome.track : .clear, in: RoundedRectangle(cornerRadius: 8))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .frame(maxWidth: .infinity)
-        .accessibilityLabel("\(source.name), \(source.settingsDomainName), \(state.title)\(count > 0 ? ", used \(count) times" : "")")
-        .task(id: source.id) {
-            await checkUsageProviderReadiness(for: source)
-        }
+        .accessibilityLabel("\(source.name), \(state.title), used \(entry.usageCount) times")
+        .task(id: source.id) { await checkUsageProviderReadiness(for: source) }
     }
 
     @ViewBuilder
     private var sourceDetail: some View {
-        if let source = runtime.descriptor(sourceID: selectedSourceID) {
+        if let source = runtime.catalogSources.first(where: { $0.id == selectedSourceID }) {
             let state = operationalState(for: source)
             SettingsPage(maxWidth: 800, alignment: .top) {
                 HStack(spacing: 10) {
-                    SourceMark(sourceID: source.id, descriptor: source, size: 18)
+                    SourceMark(sourceID: source.id, descriptor: source, size: 18, tint: .labelColor)
                         .frame(width: 28, height: 28)
                     PageTitle(title: source.name)
                     Spacer()
@@ -296,12 +255,13 @@ struct SourceSettingsPane: View {
                         SettingsStatusLine(title: state.title, attention: true)
                     }
                     QuietButton(
-                        title: "Add",
+                        title: "Add widget",
                         symbol: "plus",
                         prominence: .primary
                     ) {
                         browseComplications()
                     }
+                    .disabled(state == .needsSetup || state == .unavailable)
                     Menu {
                         Button {
                             _ = runtime.refreshSource(source.id)
@@ -355,38 +315,50 @@ struct SourceSettingsPane: View {
                     SettingsNotice(text: error, style: .warning)
                 }
 
-                sourceComplicationSection(source)
+                if source.id == HarnaisWeeklyStarter.sourceID {
+                    HarnaisUsageStatusView(runtime: runtime)
+                }
 
-                if hasConfigurationSection(for: source) {
+                if hasConfigurationSection(for: source), state == .needsSetup || state == .unavailable {
+                    sourceConfigurationSection(source, state: state)
+                    SettingsHairline()
+                }
+
+                sourceComplicationSection(source)
+                    .task(id: source.id) {
+                        await loadSelectedUsageSource(source)
+                    }
+
+                if hasConfigurationSection(for: source), state != .needsSetup && state != .unavailable {
                     SettingsHairline()
                     sourceConfigurationSection(source, state: state)
                     SettingsHairline()
                 }
 
                 SettingsDisclosure(
-                    title: "Advanced Metrics",
-                    subtitle: "\(source.metrics.count) raw values available to complication designs"
+                    title: "Available data",
+                    subtitle: "\(source.metrics.count) values available for custom widgets"
                 ) {
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 12) {
                         ForEach(source.metrics) { metric in
                             HStack(spacing: 9) {
                                 Image(systemName: metric.symbol ?? metric.kind.inspectorSymbol)
                                     .symbolRenderingMode(.monochrome)
-                                    .font(.system(size: 10, weight: .semibold))
-                                    .foregroundStyle(.white)
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(IslandChrome.text)
                                     .frame(width: 26, height: 26)
                                     .background(IslandChrome.fieldFill, in: Circle())
-                                VStack(alignment: .leading, spacing: 2) {
+                                VStack(alignment: .leading, spacing: 4) {
                                     Text(metric.name)
-                                        .font(.system(size: 12, weight: .medium))
-                                        .foregroundStyle(.white)
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundStyle(IslandChrome.text)
                                     Text(metricSourceSummary(metric))
-                                        .font(.system(size: 9, weight: .medium))
+                                        .font(.system(size: 12, weight: .medium))
                                         .foregroundStyle(IslandChrome.tertiaryText)
                                 }
                                 Spacer()
                                 Text(metricDisplayValue(metric, source: source))
-                                    .font(.system(size: 11, weight: .semibold))
+                                    .font(.system(size: 12, weight: .semibold))
                                     .foregroundStyle(IslandChrome.secondaryText)
                                     .monospacedDigit()
                             }
@@ -405,14 +377,11 @@ struct SourceSettingsPane: View {
             if $0.rank != $1.rank { return $0.rank > $1.rank }
             return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
         }
-        return SettingsGroup(title: "Complications") {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(Array(recommendations.prefix(6))) { preset in
-                        sourceComplicationCard(source: source, preset: preset)
-                    }
+        return SettingsGroup(title: "Widgets") {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 280), spacing: 12)], spacing: 12) {
+                ForEach(Array(recommendations.prefix(6))) { preset in
+                    sourceComplicationCard(source: source, preset: preset)
                 }
-                .padding(.vertical, 1)
             }
             if recommendations.count > 6 {
                 QuietButton(title: "View All", symbol: "chevron.right") {
@@ -495,25 +464,11 @@ struct SourceSettingsPane: View {
         source: ComplicationSourceDescriptor,
         preset: ComplicationDescriptor
     ) -> some View {
-        let preview = ComplicationConfiguration(
-            recipeID: preset.id,
-            sourceID: source.id,
-            metricIDs: preset.metricIDs,
-            family: preset.family,
-            labelStyle: preset.labelStyle,
-            tint: preset.tint,
-            tapAction: preset.tapAction
-        )
-        let live = runtime.values(for: preview)
-        let fixture = ComplicationPreviewFixture.values(for: preset, sourceID: source.id)
-        let previewValues = live.isEmpty ? fixture : live
         let state = operationalState(for: source)
-        let isAvailable = state == .ready || state == .available || state == .syncing
-
-        return Button {
-            guard isAvailable,
-                  let islandID = runtime.workspaceStore.selectedIslandID
-            else { return }
+        let isAvailable = state == .ready || state == .available || state == .syncing || state == .stale
+        return ComplicationRecipeCard(runtime: runtime, source: source, preset: preset, configureSource: {}) {
+            if runtime.workspaceStore.selectedIsland == nil { runtime.workspaceStore.addIsland() }
+            guard let islandID = runtime.workspaceStore.selectedIslandID else { return }
             _ = runtime.workspaceStore.addComplication(
                 to: islandID,
                 sourceID: source.id,
@@ -525,47 +480,9 @@ struct SourceSettingsPane: View {
                 tapAction: preset.tapAction
             )
             _ = runtime.refreshSource(source.id)
-        } label: {
-            HStack(spacing: 9) {
-                ComplicationSlotView(
-                    complication: preview,
-                    descriptor: source,
-                    values: previewValues,
-                    sourceError: live.isEmpty ? nil : runtime.snapshot(sourceID: source.id)?.errorDescription,
-                    quality: live.isEmpty ? .cached : runtime.quality(for: preview),
-                    trendDirection: live.isEmpty ? .unknown : runtime.trendDirection(for: preview),
-                    renderScale: 0.98
-                )
-                .frame(width: 52, height: 58)
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(preset.name)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                    Text(preset.family.displayName)
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(IslandChrome.secondaryText)
-                }
-                Spacer(minLength: 2)
-                Image(systemName: "plus")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(IslandChrome.secondaryText)
-            }
-            .padding(.horizontal, 10)
-            .frame(width: 190, height: 68)
-            .background(IslandChrome.fieldFill, in: RoundedRectangle(cornerRadius: IslandChrome.rowRadius, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: IslandChrome.rowRadius, style: .continuous)
-                    .strokeBorder(IslandChrome.controlBorder, lineWidth: 1)
-            }
-            .contentShape(RoundedRectangle(cornerRadius: IslandChrome.rowRadius, style: .continuous))
+            runtime.settingsSection = .islands
         }
-        .buttonStyle(.plain)
         .disabled(!isAvailable)
-        .opacity(isAvailable ? 1 : 0.5)
-        .help(isAvailable ? preset.question : "Finish source setup before adding this complication")
     }
 
     private var claudeSessionLink: some View {
@@ -578,12 +495,12 @@ struct SourceSettingsPane: View {
             HStack(spacing: 10) {
                 Image(systemName: "terminal")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(IslandChrome.text)
                     .frame(width: 24, height: 24)
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text("Claude Code Sessions")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.white)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(IslandChrome.text)
                     SettingsStatusLine(title: status, attention: status == "Needs Attention")
                 }
                 Spacer(minLength: 10)
@@ -621,7 +538,11 @@ struct SourceSettingsPane: View {
                 if source.kind == .system { return .unavailable }
                 return .needsSetup
             }
-            if !snapshot.values.isEmpty { return .ready }
+            if !snapshot.values.isEmpty {
+                if source.id == HarnaisWeeklyStarter.sourceID,
+                   Date().timeIntervalSince(snapshot.capturedAt) > runtime.harnaisStaleAfter { return .stale }
+                return .ready
+            }
         }
         if source.kind == .usage, providerReadiness[source.id] == false {
             return .needsSetup
@@ -641,6 +562,14 @@ struct SourceSettingsPane: View {
             return
         }
         providerReadiness[source.id] = await provider.isAvailable()
+    }
+
+    private func loadSelectedUsageSource(_ source: ComplicationSourceDescriptor) async {
+        guard source.kind == .usage || source.kind == .extensionSource else { return }
+        await checkUsageProviderReadiness(for: source)
+        if providerReadiness[source.id] == false { return }
+        if runtime.snapshot(sourceID: source.id)?.values.isEmpty == false { return }
+        _ = await runtime.refreshSource(source.id)?.value
     }
 
     private func matchesSearch(_ source: ComplicationSourceDescriptor) -> Bool {

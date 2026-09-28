@@ -229,12 +229,13 @@ public enum IslandMetrics {
     public static let clusterRingStroke: CGFloat = ringStroke
     public static let clusterAccentStroke: CGFloat = accentStroke
     public static let markSize: CGFloat = 10
-    public static let ringLabelSpacing: CGFloat = 4
-    public static let ringLabelHeight: CGFloat = 12
-    public static let itemSpacing: CGFloat = 12
-    public static let itemHeight: CGFloat = 44
-    public static let providerWindowWidth: CGFloat = 268
-    public static let providerWindowHeight: CGFloat = 176
+    public static let ringLabelSpacing: CGFloat = 2
+    public static let ringLabelHeight: CGFloat = 20
+    public static let textWidth: CGFloat = 36
+    public static let itemSpacing: CGFloat = 8
+    public static let itemHeight: CGFloat = 48
+    public static let providerWindowWidth: CGFloat = 300
+    public static let providerWindowHeight: CGFloat = 240
     public static let providerWindowGap: CGFloat = 8
     /// Pointer width reserved on the trailing edge of the hover card.
     public static let providerWindowPointerWidth: CGFloat = 7
@@ -260,6 +261,10 @@ public enum IslandMetrics {
         let usable = maxHeight - topPadding * 2
         guard usable >= itemHeight else { return 0 }
         return max(0, Int(floor((usable + itemSpacing) / (itemHeight + itemSpacing))))
+    }
+
+    public static func maximumHeight(visibleFrameHeight: CGFloat) -> CGFloat {
+        max(joinDepth * 2, visibleFrameHeight - topGap - 16)
     }
 
     public static func ringCenterY(index: Int) -> CGFloat {

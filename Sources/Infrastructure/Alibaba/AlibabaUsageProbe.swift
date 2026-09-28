@@ -4,39 +4,28 @@ import Domain
 public struct AlibabaUsageProbe: UsageProbe {
     private let settingsRepository: any AlibabaSettingsRepository
     private let networkClient: any NetworkClient
-    private let cookieProvider: any AlibabaCookieProviding
     private let timeout: TimeInterval
 
     public init(
         settingsRepository: any AlibabaSettingsRepository,
         networkClient: (any NetworkClient)? = nil,
-        cookieProvider: any AlibabaCookieProviding,
         timeout: TimeInterval = 15.0
     ) {
         self.settingsRepository = settingsRepository
         self.networkClient = networkClient ?? NetworkClients.ephemeral
-        self.cookieProvider = cookieProvider
         self.timeout = timeout
     }
 
     // MARK: - UsageProbe
 
     public func isAvailable() async -> Bool {
-        // Available if we have either a cookie or an API key
+        // Available if we have either a manual cookie or an API key
         if let apiKey = settingsRepository.getAlibabaApiKey(), !apiKey.isEmpty {
             return true
         }
 
-        let cookieSource = settingsRepository.alibabaCookieSource()
-        switch cookieSource {
-        case .manual:
-            if let cookie = settingsRepository.getAlibabaManualCookie(), !cookie.isEmpty {
-                return true
-            }
-        case .auto:
-            if let cookie = cookieProvider.extractBrowserCookies(), !cookie.isEmpty {
-                return true
-            }
+        if let cookie = settingsRepository.getAlibabaManualCookie(), !cookie.isEmpty {
+            return true
         }
 
         return false
@@ -50,7 +39,7 @@ public struct AlibabaUsageProbe: UsageProbe {
             return try await fetchWithApiKey(apiKey, region: region)
         }
 
-        // Try cookie
+        // Try manual cookie
         let cookie = try resolveCookie()
         return try await fetchWithCookie(cookie, region: region)
     }
@@ -58,20 +47,7 @@ public struct AlibabaUsageProbe: UsageProbe {
     // MARK: - Private
 
     private func resolveCookie() throws -> String {
-        let source = settingsRepository.alibabaCookieSource()
-        switch source {
-        case .manual:
-            guard let cookie = settingsRepository.getAlibabaManualCookie(), !cookie.isEmpty else {
-                throw ProbeError.authenticationRequired
-            }
-            return cookie
-        case .auto:
-            return try extractBrowserCookies()
-        }
-    }
-
-    private func extractBrowserCookies() throws -> String {
-        guard let cookie = cookieProvider.extractBrowserCookies(), !cookie.isEmpty else {
+        guard let cookie = settingsRepository.getAlibabaManualCookie(), !cookie.isEmpty else {
             throw ProbeError.authenticationRequired
         }
         return cookie

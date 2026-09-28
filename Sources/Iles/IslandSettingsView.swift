@@ -5,7 +5,8 @@ import IslandGeometry
 import SwiftUI
 import UniformTypeIdentifiers
 
-private enum SettingsSection: String, CaseIterable, Identifiable {
+enum SettingsSection: String, CaseIterable, Identifiable {
+    case overview
     case islands
     case sources
     case general
@@ -16,6 +17,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
 
     var symbol: String {
         switch self {
+        case .overview: "square.grid.2x2"
         case .islands: "capsule.portrait"
         case .sources: "square.stack.3d.up"
         case .general: "slider.horizontal.3"
@@ -25,6 +27,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
 
     var shortcut: KeyEquivalent {
         switch self {
+        case .overview: "0"
         case .islands: "1"
         case .sources: "2"
         case .general: "3"
@@ -34,6 +37,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
 
     var shortcutLabel: String {
         switch self {
+        case .overview: "0"
         case .islands: "1"
         case .sources: "2"
         case .general: "3"
@@ -41,23 +45,35 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
         }
     }
 }
+
 /// Workspace editor inspired by complication configuration: islands are
 /// containers, sources produce metrics, and each complication is an instance.
 struct IslandSettingsView: View {
     @Bindable var runtime: IslandRuntime
-    @State private var section: SettingsSection = .islands
+    @AppStorage("settingsAppearance") private var appearance: SettingsAppearance = .system
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var section: SettingsSection {
+        get { runtime.settingsSection }
+        nonmutating set { runtime.settingsSection = newValue }
+    }
     @State private var sourceID = ProviderBrand.claude.id
     @State private var presentsGallery = false
     @State private var catalogSourceID: String?
 
     var body: some View {
-        VStack(spacing: 0) {
-            tabBar
-                .padding(.horizontal, IslandChrome.pageInset)
-                .padding(.top, 8)
+        HStack(spacing: 0) {
+            navigation
+                .frame(width: 210)
+                .background(IslandChrome.sidebar)
+            Rectangle().fill(IslandChrome.hairline).frame(width: 1)
 
             Group {
                 switch section {
+                case .overview:
+                    IslandOverviewView(runtime: runtime, editIsland: { id in
+                        runtime.workspaceStore.selectIsland(id)
+                        section = .islands
+                    }, showSources: { section = .sources })
                 case .islands:
                     IslandWorkspaceEditor(
                         runtime: runtime,
@@ -72,6 +88,9 @@ struct IslandSettingsView: View {
                         runtime: runtime,
                         selectedSourceID: $sourceID,
                         browseComplications: {
+                            if runtime.workspaceStore.selectedIsland == nil {
+                                runtime.workspaceStore.addIsland()
+                            }
                             catalogSourceID = sourceID
                             presentsGallery = true
                             runtime.workspaceStore.selectedComplicationID = nil
@@ -86,50 +105,109 @@ struct IslandSettingsView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .background(IslandPalette.popover)
-        .preferredColorScheme(.dark)
+        .background(IslandChrome.background)
+        .onChange(of: appearance, initial: true) { _, value in value.apply() }
         .frame(minWidth: 1120, minHeight: 680)
+        .transaction { transaction in
+            if reduceMotion { transaction.animation = nil; transaction.disablesAnimations = true }
+        }
     }
 
-    private var tabBar: some View {
-        HStack(alignment: .bottom, spacing: 2) {
-            ForEach(SettingsSection.allCases) { item in
-                let selected = item == section
-                Button {
-                    if item == .islands {
-                        runtime.workspaceStore.selectedComplicationID = nil
-                    }
-                    if item == .sources, section == .islands,
-                       let complication = runtime.workspaceStore.selectedComplication {
-                        sourceID = complication.sourceID
-                    }
-                    section = item
-                } label: {
-                    VStack(spacing: 8) {
-                        HStack(spacing: 6) {
-                            Image(systemName: item.symbol)
-                                .font(.system(size: 11, weight: .semibold))
-                            Text(item.title)
-                                .font(.system(size: 13, weight: selected ? .semibold : .medium))
-                        }
-                        .foregroundStyle(selected ? Color.white : IslandChrome.secondaryText)
-                        .padding(.horizontal, 10)
-                        .padding(.top, 6)
-                        Rectangle()
-                            .fill(selected ? Color.white : Color.clear)
-                            .frame(height: 1)
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(selected ? .isSelected : [])
-                .keyboardShortcut(item.shortcut, modifiers: .command)
-                .help("\(item.title) Settings (⌘\(item.shortcutLabel))")
+    private var navigation: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 9) {
+                Image(systemName: "capsule.portrait.fill")
+                    .font(.system(size: 18, weight: .medium))
+                Text("Iles").font(.system(size: 18, weight: .semibold))
             }
-            Spacer()
+            .foregroundStyle(IslandChrome.text)
+            .padding(.horizontal, 12)
+            .padding(.top, 20)
+            .padding(.bottom, 18)
+
+            ForEach([SettingsSection.overview, .islands, .sources]) { item in
+                navigationButton(item)
+            }
+
+            if section == .islands {
+                SettingsHairline().padding(.vertical, 12)
+                HStack {
+                    Text("MY ISLANDS")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(IslandChrome.secondaryText)
+                    Spacer()
+                    QuietIconButton(symbol: "plus", accessibilityName: "Add island", helpText: "Add an island") {
+                        runtime.workspaceStore.addIsland()
+                    }
+                }
+                .padding(.horizontal, 10)
+                ScrollView {
+                    VStack(spacing: 4) {
+                        ForEach(runtime.workspaceStore.islands) { island in
+                            Button {
+                                runtime.workspaceStore.selectIsland(island.id)
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: island.isVisible ? "capsule.portrait" : "eye.slash")
+                                        .frame(width: 18)
+                                    Text(island.name).lineLimit(1)
+                                    Spacer(minLength: 0)
+                                    Text("\(runtime.visibleComplications(on: island).count)")
+                                        .foregroundStyle(IslandChrome.secondaryText)
+                                        .monospacedDigit()
+                                }
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(IslandChrome.text)
+                                .padding(.horizontal, 10)
+                                .frame(height: 34)
+                                .background(runtime.workspaceStore.selectedIslandID == island.id ? IslandChrome.selectedFill : .clear,
+                                            in: RoundedRectangle(cornerRadius: 8))
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityAddTraits(runtime.workspaceStore.selectedIslandID == island.id ? .isSelected : [])
+                            .contextMenu {
+                                Button("Duplicate") { runtime.workspaceStore.duplicateIsland(island.id) }
+                            }
+                        }
+                    }
+                }
+            }
+            Spacer(minLength: 12)
+            SettingsHairline().padding(.vertical, 8)
+            navigationButton(.general)
+            navigationButton(.about)
         }
-        .overlay(alignment: .bottom) {
-            Rectangle().fill(IslandChrome.hairline).frame(height: 1)
+        .padding(.horizontal, 10)
+        .padding(.bottom, 10)
+    }
+
+    private func navigationButton(_ item: SettingsSection) -> some View {
+        let selected = item == section
+        return Button {
+            if item == .islands { runtime.workspaceStore.selectedComplicationID = nil }
+            if item == .sources, section == .islands,
+               let complication = runtime.workspaceStore.selectedComplication {
+                sourceID = complication.sourceID
+            }
+            section = item
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: item.symbol).frame(width: 18)
+                Text(item.title)
+                Spacer()
+            }
+            .font(.system(size: 13, weight: selected ? .semibold : .medium))
+            .foregroundStyle(selected ? IslandChrome.text : IslandChrome.secondaryText)
+            .padding(.horizontal, 12)
+            .frame(height: 36)
+            .background(selected ? IslandChrome.track : .clear, in: RoundedRectangle(cornerRadius: 8))
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: selected)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .keyboardShortcut(item.shortcut, modifiers: .command)
+        .help("\(item.title) (⌘\(item.shortcutLabel))")
     }
 }

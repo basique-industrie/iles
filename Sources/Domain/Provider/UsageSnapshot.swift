@@ -29,6 +29,9 @@ public struct UsageSnapshot: Sendable, Equatable {
     /// Generic metrics from extension probes
     public let extensionMetrics: [ExtensionMetric]?
 
+    /// Visibility preferences from an aggregating source; quotas remain available for editing.
+    public let hiddenQuotaTypes: Set<String>
+
     // MARK: - Initialization
 
     public init(
@@ -41,7 +44,8 @@ public struct UsageSnapshot: Sendable, Equatable {
         accountTier: AccountTier? = nil,
         costUsage: CostUsage? = nil,
         dailyUsageReport: DailyUsageReport? = nil,
-        extensionMetrics: [ExtensionMetric]? = nil
+        extensionMetrics: [ExtensionMetric]? = nil,
+        hiddenQuotaTypes: Set<String> = []
     ) {
         self.providerId = providerId
         self.quotas = quotas
@@ -53,6 +57,7 @@ public struct UsageSnapshot: Sendable, Equatable {
         self.costUsage = costUsage
         self.dailyUsageReport = dailyUsageReport
         self.extensionMetrics = extensionMetrics
+        self.hiddenQuotaTypes = hiddenQuotaTypes
     }
 
     // MARK: - Domain Queries

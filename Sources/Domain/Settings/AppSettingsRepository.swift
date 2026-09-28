@@ -24,4 +24,8 @@ public protocol AppSettingsRepository: Sendable {
     func emptyWorkspaceHintDismissed() -> Bool
     func setEmptyWorkspaceHintDismissed(_ dismissed: Bool)
 
+    /// When Harnais is managing Claude/Codex/Cursor accounts, hide those
+    /// first-party sources so the island does not double-count the same login.
+    func hideBuiltInAIWhenHarnais() -> Bool
+    func setHideBuiltInAIWhenHarnais(_ enabled: Bool)
 }

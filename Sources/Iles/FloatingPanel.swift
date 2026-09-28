@@ -22,7 +22,7 @@ final class FloatingPanel: NSPanel {
         isMovableByWindowBackground = false
         isReleasedWhenClosed = false
         isExcludedFromWindowsMenu = true
-        animationBehavior = animates ? .utilityWindow : .none
+        animationBehavior = animates && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? .utilityWindow : .none
     }
 
     override var canBecomeKey: Bool { true }

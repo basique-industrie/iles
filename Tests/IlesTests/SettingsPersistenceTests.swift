@@ -125,6 +125,40 @@ extension IlesSelfTests {
                 reloaded.emptyWorkspaceHintDismissed(),
                 "empty-workspace hint dismissal reloads from settings"
             )
+            test.expect(!box.settings.hideBuiltInAIWhenHarnais(), "Harnais overlap hiding starts off")
+            box.settings.setHideBuiltInAIWhenHarnais(true)
+            test.expect(box.settings.hideBuiltInAIWhenHarnais(), "Harnais overlap hiding persists")
+            let reloadedHarnais = JSONSettingsRepository(
+                store: JSONSettingsStore(fileURL: box.store.fileURL),
+                secureCredentials: box.secureCredentials
+            )
+            test.expect(
+                reloadedHarnais.hideBuiltInAIWhenHarnais(),
+                "Harnais overlap hiding reloads from settings"
+            )
+            let demo = IslandProviders.makeAll(demo: true, settings: box.settings)
+            let hidden = IslandProviders.applyingHarnaisOverlap(demo, settings: box.settings, harnaisPresent: true)
+            test.expect(
+                !hidden.contains { $0.id == ProviderIdentity.claude.rawValue },
+                "Harnais overlap hiding removes built-in Claude"
+            )
+            test.expect(
+                !hidden.contains { $0.id == ProviderIdentity.codex.rawValue },
+                "Harnais overlap hiding removes built-in Codex"
+            )
+            test.expect(
+                !hidden.contains { $0.id == ProviderIdentity.cursor.rawValue },
+                "Harnais overlap hiding removes built-in Cursor"
+            )
+            test.expect(
+                hidden.contains { $0.id == ProviderIdentity.harnais.rawValue },
+                "Harnais overlap hiding keeps the Harnais source"
+            )
+            let visible = IslandProviders.applyingHarnaisOverlap(demo, settings: box.settings, harnaisPresent: false)
+            test.expect(
+                visible.contains { $0.id == ProviderIdentity.claude.rawValue },
+                "Harnais overlap hiding stays off until quotas.json exists"
+            )
         }
 
         do {
@@ -332,6 +366,26 @@ extension IlesSelfTests {
                 96,
                 "re-adding the first island restores the last empty placement"
             )
+        }
+
+        do {
+            let data = Data(#"{"usedPercent":45,"windowDurationMins":10080,"resetsAt":1789901779}"#.utf8)
+            let dict = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+            let window = DefaultCodexRPCClient().parseWindow(dict)
+            test.expectEqual(window?.usedPercent, 45, "Codex JSON integer usedPercent is 45% used")
+            test.expect(window?.resetDescription != nil, "Codex JSON integer resetsAt formats a reset")
+            let client = DefaultCodexRPCClient()
+            test.expectEqual(client.parseWindow(["used_percent": " 45.5 "])?.usedPercent, 45.5,
+                "Codex snake-case numeric strings are accepted")
+            for invalid in ["nan", "inf", "-inf"] {
+                test.expect(client.parseWindow(["usedPercent": invalid]) == nil,
+                    "nonfinite Codex usage is rejected: \(invalid)")
+                test.expect(client.parseWindow(["usedPercent": 45, "resetsAt": invalid])?.resetDescription == nil,
+                    "nonfinite reset timestamps cannot reach integer date formatting")
+            }
+            test.expect(client.parseWindow(["usedPercent": 45, "resetsAt": 1e300])?.resetDescription == nil,
+                "out-of-range reset timestamps cannot overflow the formatter")
+
         }
 
         do {

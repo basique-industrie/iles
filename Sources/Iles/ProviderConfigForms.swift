@@ -66,7 +66,7 @@ private struct ClaudeConfigForm: View {
     @State private var hasCredentials = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             FieldLabel(title: "Probe mode")
             IslandSegmentBar(
                 items: Array(ClaudeProbeMode.allCases),
@@ -169,7 +169,7 @@ private struct CodexConfigForm: View {
     @State private var hasCredentials = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             FieldLabel(title: "Probe mode")
             IslandSegmentBar(
                 items: Array(CodexProbeMode.allCases),
@@ -207,7 +207,7 @@ private struct KimiConfigForm: View {
     @State private var showToken = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             FieldLabel(title: "Probe mode")
             IslandSegmentBar(
                 items: Array(KimiProbeMode.allCases),
@@ -234,7 +234,6 @@ private struct KimiConfigForm: View {
                     okText: "Saved API token available",
                     failText: "No saved token; KIMI_AUTH_TOKEN can be used instead."
                 )
-                SettingsNotice(text: "Browser cookie import is not bundled; use a saved token or KIMI_AUTH_TOKEN.")
             }
         }
     }
@@ -418,7 +417,6 @@ private struct AlibabaConfigForm: View {
     @Bindable var runtime: IslandRuntime
     private let settings = JSONSettingsRepository.shared
     @State private var region = JSONSettingsRepository.shared.alibabaRegion()
-    @State private var cookieSource = JSONSettingsRepository.shared.alibabaCookieSource()
     @State private var cookie = JSONSettingsRepository.shared.getAlibabaManualCookie() ?? ""
     @State private var apiKey = ""
     @State private var showCookie = false
@@ -438,34 +436,18 @@ private struct AlibabaConfigForm: View {
                 runtime.refreshProvider(ProviderIdentity.alibaba.rawValue)
             }
 
-            FieldLabel(title: "Cookie source")
-            IslandSegmentBar(
-                items: Array(AlibabaCookieSource.allCases),
-                selection: $cookieSource,
-                title: { $0 == .auto ? "Auto" : "Manual" },
-                symbol: nil
-            )
-            .onChange(of: cookieSource) { _, value in
-                settings.setAlibabaCookieSource(value)
-                runtime.refreshProvider(ProviderIdentity.alibaba.rawValue)
-            }
-
-            if cookieSource == .auto {
-                SettingsNotice(
-                    text: "Automatic browser cookies are not bundled. Use a manual cookie or API key.",
-                    style: .warning
-                )
-            }
-            if cookieSource == .manual {
-                IslandSecretField(title: "Cookie", text: $cookie, reveal: $showCookie) {
+            IslandSecretField(title: "Cookie", text: $cookie, reveal: $showCookie) {
+                if cookie.isEmpty {
+                    settings.deleteAlibabaManualCookie()
+                } else {
                     settings.saveAlibabaManualCookie(cookie)
                 }
-                CredentialNote(
-                    ok: !cookie.isEmpty || settings.getAlibabaManualCookie() != nil,
-                    okText: "Saved browser cookie available",
-                    failText: "No manual browser cookie saved."
-                )
             }
+            CredentialNote(
+                ok: !cookie.isEmpty || settings.getAlibabaManualCookie() != nil,
+                okText: "Saved browser cookie available",
+                failText: "No manual browser cookie saved."
+            )
             IslandSecretField(title: "API key", text: $apiKey, reveal: $showKey) {
                 if apiKey.isEmpty {
                     settings.deleteAlibabaApiKey()

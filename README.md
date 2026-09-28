@@ -42,7 +42,7 @@ ad-hoc, a different bundle ID, and isolated settings so it can run next to
 - Nine families: ring, dual ring, value, status, activity, countdown, trend,
   summary, and trio ring
 - Per-element data, used or remaining, tint, label, and click action
-- 88 first-party recipes; a recipe appears only when its source has the metrics
+- 92 first-party recipes; a recipe appears only when its source has the metrics
 - Local extensions trusted by content fingerprint — no marketplace, no
   automatic update
 
@@ -54,7 +54,7 @@ ad-hoc, a different bundle ID, and isolated settings so it can run next to
   recent sessions
 - **Time** — clock and period progress, Calendar, meeting progress, free time,
   and Reminders
-- **Mac** — battery, CPU, memory, storage, network, thermal state, low-power
+- **Mac** — CPU, memory, storage, network, thermal state, low-power
   mode, and uptime
 - **Focus** — an app-owned focus and break timer, daily goal, sessions, and
   streak
@@ -64,7 +64,10 @@ ad-hoc, a different bundle ID, and isolated settings so it can run next to
 
 AI sources include Claude, Codex, Gemini, Antigravity, Z.ai, Copilot, Amp, Kimi,
 Kiro, Cursor, MiniMax, DeepSeek, Vercel, Alibaba, Mistral, OpenCode, OpenCode
-Mobile, and Grok.
+Mobile, Grok, and Harnais. Harnais supplies configured Claude, Codex, and Cursor
+accounts. Iles refreshes their usage through the local Harnais account helper,
+using its own schedule even when the Harnais app is closed. The catalog shows
+AI sources referenced by saved islands and Harnais accounts with fetched usage.
 
 See [Extension manifest v2](docs/extension-manifest-v2.md) to add a local
 source.

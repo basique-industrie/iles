@@ -185,6 +185,7 @@ public struct SourceSnapshot: Codable, Equatable, Sendable {
     public let errorDescription: String?
     public let quality: ComplicationSampleQuality
     public let availability: ComplicationAvailability
+    public let quotaGroups: [SourceQuotaGroup]?
 
     public init(
         sourceID: String,
@@ -192,7 +193,8 @@ public struct SourceSnapshot: Codable, Equatable, Sendable {
         values: [String: ComplicationValue],
         errorDescription: String? = nil,
         quality: ComplicationSampleQuality = .live,
-        availability: ComplicationAvailability = .available
+        availability: ComplicationAvailability = .available,
+        quotaGroups: [SourceQuotaGroup]? = nil
     ) {
         self.sourceID = sourceID
         self.capturedAt = capturedAt
@@ -200,6 +202,27 @@ public struct SourceSnapshot: Codable, Equatable, Sendable {
         self.errorDescription = errorDescription
         self.quality = quality
         self.availability = availability
+        self.quotaGroups = quotaGroups
+    }
+
+    /// Groups that contain any of `metricIDs`. Empty `metricIDs` returns every group.
+    public func focusedQuotaGroups(matching metricIDs: [String]) -> [SourceQuotaGroup] {
+        let groups = quotaGroups ?? []
+        let ids = Set(metricIDs)
+        guard !ids.isEmpty else { return groups }
+        return groups.filter { group in
+            group.metricIDs.contains(where: ids.contains)
+        }
+    }
+}
+
+public struct SourceQuotaGroup: Codable, Equatable, Sendable {
+    public let title: String
+    public let metricIDs: [String]
+
+    public init(title: String, metricIDs: [String]) {
+        self.title = title
+        self.metricIDs = metricIDs
     }
 }
 

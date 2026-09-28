@@ -6,63 +6,78 @@ import SwiftUI
 struct GeneralSettingsPane: View {
     @Bindable var runtime: IslandRuntime
     private let settings = JSONSettingsRepository.shared
+    @AppStorage("settingsAppearance") private var appearance: SettingsAppearance = .system
     @State private var interval: RefreshInterval = .tenMinutes
     @State private var launchAtLogin = false
+    @State private var hideBuiltInWhenHarnais = false
     @State private var confirmsLogDeletion = false
     @State private var settingsError: String?
 
     var body: some View {
-        SettingsPage(maxWidth: 680, alignment: .top) {
-            PageTitle(title: "General")
+        SettingsPage(maxWidth: 720, alignment: .topLeading) {
+            SettingsPageHeader(title: "General", subtitle: "Appearance, startup and background updates.")
 
-            SettingsGroup(title: "Behavior") {
-                SettingsToggleRow(title: "Launch at login", isOn: $launchAtLogin)
+            IslandCard(padding: 16) {
+                SettingsGroup(title: "Appearance", subtitle: "Islands keep their own colors in every appearance.") {
+                    IslandSegmentBar(items: SettingsAppearance.allCases, selection: $appearance, title: \.title)
+                }
+            }
+
+            IslandCard(padding: 0) {
+                SettingsToggleRow(title: "Open Iles at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, value in launchAtLogin = LaunchAtLogin.setEnabled(value) }
             }
 
-            SettingsHairline()
-
-            SettingsGroup(
-                title: "Background Refresh",
-                subtitle: "Network sources use this interval. Live local sources keep their own cadence."
-            ) {
-                IslandSegmentBar(items: RefreshInterval.allCases, selection: $interval, title: { $0.label })
-                    .onChange(of: interval) { _, value in
-                        settings.setRefreshInterval(value)
-                        runtime.applyRefreshInterval()
-                    }
+            IslandCard(padding: 16) {
+                SettingsGroup(title: "Background updates", subtitle: "Applies to network sources. Local data uses its own refresh interval.") {
+                    IslandSegmentBar(items: RefreshInterval.allCases, selection: $interval, title: { $0.label })
+                        .onChange(of: interval) { _, value in
+                            settings.setRefreshInterval(value)
+                            runtime.applyRefreshInterval()
+                        }
+                }
             }
 
+            SettingsDisclosure(title: "Advanced", subtitle: "Standalone AI providers") {
+                SettingsToggleRow(title: "Hide standalone providers supplied by Harnais", isOn: $hideBuiltInWhenHarnais)
+                    .onChange(of: hideBuiltInWhenHarnais) { _, value in
+                        settings.setHideBuiltInAIWhenHarnais(value)
+                        runtime.applyHarnaisOverlap()
+                    }
+            }
             SettingsHairline()
 
             SettingsDisclosure(
                 title: "Diagnostics",
                 subtitle: "Logs and local configuration"
             ) {
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 12) {
                     MetricPair(title: "Settings file", value: JSONSettingsStore.defaultFileURL().path)
                     MetricPair(title: "Log file", value: AppIdentity.current.logFileURL.path)
                     if let settingsError {
                         Label(settingsError, systemImage: "exclamationmark.triangle")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(.orange)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(IslandChrome.error)
                     }
                     SettingsHairline()
-                    HStack(spacing: 8) {
-                        QuietButton(title: "Open Current Log", symbol: "doc.text") { AppLog.openCurrentLogFile() }
-                        QuietButton(title: "Show Logs in Finder", symbol: "folder") { AppLog.openLogsDirectory() }
-                        QuietButton(title: "Export Support Log", symbol: "square.and.arrow.up") { exportSupportLog() }
-                        QuietButton(title: "Clear Logs", symbol: "trash") { confirmsLogDeletion = true }
+                    VStack(spacing: 8) {
+                        HStack(spacing: 8) {
+                            QuietButton(title: "Open Current Log", symbol: "doc.text") { AppLog.openCurrentLogFile() }
+                            QuietButton(title: "Show Logs in Finder", symbol: "folder") { AppLog.openLogsDirectory() }
+                        }
+                        HStack(spacing: 8) {
+                            QuietButton(title: "Export Support Log", symbol: "square.and.arrow.up") { exportSupportLog() }
+                            QuietButton(title: "Clear Logs", symbol: "trash") { confirmsLogDeletion = true }
+                        }
                     }
-                    Text("Support logs are redacted, limited in size, and exported only when you choose a destination.")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(IslandChrome.tertiaryText)
+                    SettingsCaption(text: "Support logs are redacted, limited in size, and exported only when you choose a destination.")
                 }
             }
         }
         .onAppear {
             interval = settings.refreshInterval()
             launchAtLogin = LaunchAtLogin.isEnabled
+            hideBuiltInWhenHarnais = settings.hideBuiltInAIWhenHarnais()
             settingsError = JSONSettingsStore.shared.lastErrorDescription
         }
         .onReceive(NotificationCenter.default.publisher(for: .settingsStoreError)) { notification in
@@ -99,36 +114,39 @@ struct AboutSettingsPane: View {
     private var copyright: String { Bundle.main.infoDictionary?["NSHumanReadableCopyright"] as? String ?? "Copyright © 2026" }
 
     var body: some View {
-        SettingsPage(maxWidth: 560, alignment: .top) {
+        SettingsPage(maxWidth: 720, alignment: .topLeading) {
+            SettingsPageHeader(title: "About Iles", subtitle: "Desktop widgets for usage and local data.")
+            IslandCard(padding: 24) {
             VStack(spacing: 9) {
                 IlesAppMark()
                     .frame(width: 64, height: 64)
                 Text(AppIdentity.current.displayName)
-                    .font(.system(size: 19, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(IslandChrome.text)
                 Text(
                     AppIdentity.current.isDevelopment
-                        ? "Development build — isolated from the shipped app"
-                        : "A complication workspace for your Mac"
+                        ? "Development build"
+                        : "Widgets at your screen’s edge"
                 )
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 14))
                     .foregroundStyle(IslandChrome.secondaryText)
                 Text("Version \(version) (\(build))")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(IslandChrome.tertiaryText)
             }
             .frame(maxWidth: .infinity)
-            .padding(.top, 56)
+            .padding(.vertical, 12)
+            }
 
             Text("Your usage data stays on this Mac. Iles has no analytics, advertising, or telemetry.")
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: 13))
                 .foregroundStyle(IslandChrome.secondaryText)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 380)
                 .frame(maxWidth: .infinity)
 
-            HStack(spacing: 6) {
-                QuietButton(title: "Source Code", symbol: "chevron.left.forwardslash.chevron.right") {
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                QuietButton(title: "Source code", symbol: "chevron.left.forwardslash.chevron.right") {
                     openProjectPage("")
                 }
                 QuietButton(title: "Privacy", symbol: "hand.raised") {
@@ -144,7 +162,7 @@ struct AboutSettingsPane: View {
             .frame(maxWidth: .infinity)
 
             Text(copyright)
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(IslandChrome.tertiaryText)
                 .frame(maxWidth: .infinity, alignment: .center)
         }
@@ -160,10 +178,10 @@ struct AboutSettingsPane: View {
 private struct IlesAppMark: View {
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 15, style: .continuous)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(Color.black)
-            RoundedRectangle(cornerRadius: 15, style: .continuous)
-                .strokeBorder(IslandChrome.selectionBorder, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(IslandChrome.border, lineWidth: 1)
             HStack(spacing: 3) {
                 ForEach([0.72, 0.5, 0.84], id: \.self) { progress in
                     ZStack {

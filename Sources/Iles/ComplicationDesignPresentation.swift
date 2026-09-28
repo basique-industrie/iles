@@ -20,7 +20,7 @@ extension ComplicationSourceDescriptor {
         if id.hasPrefix("productivity.") { return "Focus" }
         if id.hasPrefix("calendar.") { return "Time & Calendar" }
         if kind == .usage { return "AI Usage" }
-        if id.hasPrefix("system.mac") || id == "system.battery" { return "Mac Health" }
+        if id.hasPrefix("system.mac") { return "Mac Health" }
         return kind.displayName
     }
 

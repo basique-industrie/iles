@@ -127,7 +127,7 @@ final class ProviderComplicationSource: ComplicationSource {
             metrics.append(
                 ComplicationMetricDescriptor(
                     id: id,
-                    name: quota.quotaType.title(style: .row, providerId: provider.id),
+                    name: quotaMetricName(for: quota),
                     kind: .gauge,
                     symbol: "gauge.with.dots.needle.50percent",
                     unit: "%",
@@ -362,8 +362,41 @@ final class ProviderComplicationSource: ComplicationSource {
                     state: .temporarilyUnavailable,
                     message: "Showing the last successful provider snapshot.",
                     recoveryAction: .retry
-                )
+                ),
+            quotaGroups: sourceGroups(from: snapshot)
         )
+    }
+
+    private func sourceGroups(from snapshot: UsageSnapshot) -> [SourceQuotaGroup]? {
+        guard snapshot.hasQuotaGroups else { return nil }
+        let groups = snapshot.quotaGroups.compactMap { group -> SourceQuotaGroup? in
+            guard let title = group.title else { return nil }
+            let ids = group.quotas.map { metricID(for: $0) }
+            return SourceQuotaGroup(title: title, metricIDs: ids)
+        }
+        return groups.isEmpty ? nil : groups
+    }
+
+    private func metricID(for quota: UsageQuota) -> String {
+        if quota.isDollarBased { return Self.balanceMetricID(for: quota) }
+        switch quota.quotaType {
+        case .session: return "quota.session"
+        case .weekly: return "quota.weekly"
+        default: return "quota.key.\(quota.quotaType.quotaKey)"
+        }
+    }
+
+    private func quotaMetricName(for quota: UsageQuota) -> String {
+        if provider.id == ProviderIdentity.harnais.rawValue {
+            let account = UsageQuota.privacySafeTitle(quota.group)
+                ?? quota.quotaType.title(style: .row, providerId: quota.providerId)
+            if let compact = quota.compactTitle, !compact.isEmpty {
+                let label = compact.prefix(1).uppercased() + String(compact.dropFirst())
+                return "\(account) · \(label)"
+            }
+            return account
+        }
+        return quota.quotaType.title(style: .row, providerId: provider.id)
     }
 
     private func value(for quota: UsageQuota) -> ComplicationValue {

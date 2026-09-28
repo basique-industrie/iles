@@ -29,7 +29,8 @@ struct SettingsPage<Content: View>: View {
                 content()
             }
             .frame(maxWidth: maxWidth, alignment: .leading)
-            .padding(IslandChrome.pageInset)
+            .padding(.horizontal, IslandChrome.pageInset)
+            .padding(.vertical, IslandChrome.pageInset)
             .frame(maxWidth: .infinity, alignment: alignment)
         }
         .scrollIndicators(.hidden)
@@ -44,8 +45,8 @@ struct CredentialNote: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Circle()
-                .fill(Color.white.opacity(ok ? 0.55 : 0.2))
-                .frame(width: 6, height: 6)
+                .fill(ok ? IslandChrome.success : IslandChrome.error)
+                .frame(width: 8, height: 8)
                 .padding(.top, 4)
             SettingsCaption(text: ok ? okText : failText)
         }
@@ -55,18 +56,24 @@ struct CredentialNote: View {
 enum SettingsNoticeStyle {
     case information
     case warning
+    case error
+    case success
 
     var symbol: String {
         switch self {
         case .information: "info.circle"
         case .warning: "exclamationmark.triangle"
+        case .error: "exclamationmark.circle"
+        case .success: "checkmark.circle"
         }
     }
 
     var foreground: Color {
         switch self {
         case .information: IslandChrome.secondaryText
-        case .warning: Color.orange.opacity(0.9)
+        case .warning: IslandChrome.warning
+        case .error: IslandChrome.error
+        case .success: IslandChrome.success
         }
     }
 }
@@ -78,10 +85,10 @@ struct SettingsNotice: View {
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: style.symbol)
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: 12, weight: .semibold))
                 .padding(.top, 1)
             Text(text)
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: 12, weight: .medium))
                 .fixedSize(horizontal: false, vertical: true)
         }
         .foregroundStyle(style.foreground)
@@ -89,11 +96,11 @@ struct SettingsNotice: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             IslandChrome.fieldFill,
-            in: RoundedRectangle(cornerRadius: IslandChrome.fieldRadius, style: .continuous)
+            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
         )
         .overlay {
-            RoundedRectangle(cornerRadius: IslandChrome.fieldRadius, style: .continuous)
-                .strokeBorder(IslandChrome.controlBorder, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(IslandChrome.border, lineWidth: 1)
         }
     }
 }
@@ -108,11 +115,12 @@ struct IslandTextField: View {
     @State private var isDirty = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
             FieldLabel(title: title)
             TextField(prompt, text: $text)
                 .textFieldStyle(.plain)
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(IslandChrome.text)
                 .islandFieldChrome()
                 .focused($isFocused)
                 .onSubmit(commitIfNeeded)
@@ -124,8 +132,8 @@ struct IslandTextField: View {
                 }
             if let validationMessage {
                 Label(validationMessage, systemImage: "exclamationmark.circle")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Color.orange.opacity(0.9))
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(IslandChrome.error)
             }
         }
     }
@@ -146,7 +154,7 @@ struct IslandSecretField: View {
     @State private var isDirty = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
             FieldLabel(title: title)
             HStack(spacing: 8) {
                 Group {
@@ -157,13 +165,14 @@ struct IslandSecretField: View {
                     }
                 }
                 .textFieldStyle(.plain)
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(IslandChrome.text)
                 .focused($isFocused)
                 Button {
                     reveal.toggle()
                 } label: {
                     Image(systemName: reveal ? "eye.slash" : "eye")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(IslandChrome.secondaryText)
                 }
                 .buttonStyle(.plain)
@@ -191,14 +200,40 @@ struct IslandSecretField: View {
 private extension View {
     func islandFieldChrome() -> some View {
         padding(.horizontal, 10)
-            .padding(.vertical, 8)
+            .frame(minHeight: IslandChrome.fieldHeight)
             .background(
                 IslandChrome.fieldFill,
-                in: RoundedRectangle(cornerRadius: IslandChrome.fieldRadius, style: .continuous)
+                in: RoundedRectangle(cornerRadius: 8, style: .continuous)
             )
             .overlay {
-                RoundedRectangle(cornerRadius: IslandChrome.fieldRadius, style: .continuous)
-                    .strokeBorder(IslandChrome.controlBorder, lineWidth: 1)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(IslandChrome.border, lineWidth: 1)
             }
+    }
+}
+
+struct SettingsPageHeader<Actions: View>: View {
+    let title: String
+    var subtitle: String? = nil
+    @ViewBuilder var actions: () -> Actions
+
+    var body: some View {
+        HStack(spacing: 16) {
+            VStack(alignment: .leading, spacing: 5) {
+                PageTitle(title: title)
+                if let subtitle { SettingsCaption(text: subtitle) }
+            }
+            Spacer(minLength: 12)
+            actions()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+extension SettingsPageHeader where Actions == EmptyView {
+    init(title: String, subtitle: String? = nil) {
+        self.title = title
+        self.subtitle = subtitle
+        self.actions = { EmptyView() }
     }
 }

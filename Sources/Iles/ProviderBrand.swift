@@ -23,6 +23,7 @@ enum ProviderBrand: String, CaseIterable, Identifiable {
     case openCode = "opencode-go"
     case omp
     case grok
+    case harnais
 
     var id: String { rawValue }
 
@@ -52,6 +53,7 @@ enum ProviderBrand: String, CaseIterable, Identifiable {
         case .openCode: Color(red: 0.22, green: 0.84, blue: 0.87)
         case .omp: Color(red: 0.45, green: 0.72, blue: 1)
         case .grok: Color(red: 0.92, green: 0.92, blue: 0.92)
+        case .harnais: Color(red: 0.86, green: 0.62, blue: 0.38)
         }
     }
 
@@ -75,6 +77,7 @@ enum ProviderBrand: String, CaseIterable, Identifiable {
         case .openCode: ("OpenCodeIcon", "svg")
         case .omp: ("OmpIcon", "svg")
         case .grok: ("GrokIcon", "svg")
+        case .harnais: ("HarnaisIcon", "svg")
         }
     }
 
@@ -98,6 +101,7 @@ enum ProviderBrand: String, CaseIterable, Identifiable {
         case .openCode: "chevron.left.forwardslash.chevron.right"
         case .omp: "iphone"
         case .grok: "theatermasks"
+        case .harnais: "point.3.connected.trianglepath.dotted"
         }
     }
 
@@ -149,6 +153,8 @@ enum ProviderBrand: String, CaseIterable, Identifiable {
             "Install Oh My Pi, sign in to at least one provider, and confirm `omp usage --json` works in Terminal."
         case .grok:
             "Install the Grok CLI and sign in so its local OAuth credentials are available."
+        case .harnais:
+            "Add your accounts in Harnais, then refresh this source in Iles. Iles fetches usage through the Harnais account helper."
         }
     }
 
@@ -167,9 +173,16 @@ enum ProviderBrand: String, CaseIterable, Identifiable {
 enum ComplicationSourceStyle {
     static func accent(
         sourceID: String,
-        descriptor: ComplicationSourceDescriptor?
+        descriptor: ComplicationSourceDescriptor?,
+        metricIDs: [String] = []
     ) -> Color {
-        if let brand = ProviderBrand(rawValue: sourceID) { return brand.accent }
+        if let brand = HarnaisGlance.resolvedBrand(
+            sourceID: sourceID,
+            metricIDs: metricIDs,
+            descriptor: descriptor
+        ) {
+            return brand.accent
+        }
         if sourceID == "system.clock" || sourceID.hasPrefix("calendar.") {
             return Color(red: 0.45, green: 0.66, blue: 1)
         }
@@ -198,10 +211,20 @@ enum ComplicationSourceStyle {
 struct ProviderMark: View {
     let brand: ProviderBrand
     var size: CGFloat = 26
+    var zoomsOnHover = false
+    var tint: NSColor = .white
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isHovering = false
 
     var body: some View {
-        VectorTemplateMark(resource: brand.iconResource)
+        VectorTemplateMark(resource: brand.iconResource, tint: tint)
             .frame(width: size, height: size)
+            .scaleEffect(zoomsOnHover && isHovering && !reduceMotion ? 1.08 : 1)
+            .animation(.easeOut(duration: 0.14), value: isHovering)
+            .onHover { hovering in
+                guard zoomsOnHover else { return }
+                isHovering = hovering
+            }
     }
 }
 
@@ -211,14 +234,17 @@ struct ProviderMark: View {
 /// window crosses displays. NSImageView redraws the SVG at the active backing scale.
 struct VectorTemplateMark: NSViewRepresentable {
     let resource: (name: String, ext: String)
+    var tint: NSColor = .white
 
     func makeNSView(context: Context) -> VectorMarkContainerView {
         let view = VectorMarkContainerView()
+        view.tint = tint
         view.image = VectorMarkCache.image(named: resource.name, extension: resource.ext)
         return view
     }
 
     func updateNSView(_ view: VectorMarkContainerView, context: Context) {
+        view.tint = tint
         view.image = VectorMarkCache.image(named: resource.name, extension: resource.ext)
         view.needsDisplay = true
     }
@@ -237,12 +263,19 @@ struct VectorTemplateMark: NSViewRepresentable {
 final class VectorMarkContainerView: NSView {
     private let imageView = NSImageView()
 
+    var tint: NSColor {
+        get { imageView.contentTintColor ?? .white }
+        set { imageView.contentTintColor = newValue }
+    }
+
     var image: NSImage? {
         get { imageView.image }
         set { imageView.image = newValue }
     }
 
     override var intrinsicContentSize: NSSize { NSSize(width: 1, height: 1) }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)

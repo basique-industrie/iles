@@ -16,14 +16,17 @@ final class ComplicationSourceRegistry {
     init(
         providers: [any AIProvider],
         sessionMonitor: SessionMonitor,
+        includeLegacyBattery: Bool = false,
         settingsStore: JSONSettingsStore = .shared
     ) {
         self.settingsStore = settingsStore
         configurableCatalog = ConfigurableSourceInstanceCatalog(store: settingsStore)
         let calendarStore = CalendarDataStore()
         sources = providers.map { ProviderComplicationSource(provider: $0) }
-        sources.append(BatteryComplicationSource())
         sources.append(MacSystemComplicationSource())
+        // Preserve saved battery widgets without returning the retired source
+        // to new installations' catalogs.
+        if includeLegacyBattery { sources.append(BatteryComplicationSource()) }
         sources.append(ClockComplicationSource(store: settingsStore))
         sources.append(FocusComplicationSource(store: settingsStore))
         sources.append(GitComplicationSource(store: settingsStore))
@@ -54,6 +57,14 @@ final class ComplicationSourceRegistry {
         let source = ProviderComplicationSource(provider: provider)
         sources.append(source)
         sourcesByID[source.id] = source
+    }
+
+    func unregister(id: String) {
+        guard let index = sources.firstIndex(where: { $0.id == id }) else { return }
+        inFlightRefreshes[id]?.task.cancel()
+        inFlightRefreshes[id] = nil
+        sources.remove(at: index)
+        sourcesByID[id] = nil
     }
 
     @discardableResult

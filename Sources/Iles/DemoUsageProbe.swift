@@ -114,6 +114,66 @@ struct DemoUsageProbe: UsageProbe {
         )
     )
 
+    static let harnais = DemoUsageProbe(
+        snapshot: UsageSnapshot(
+            providerId: ProviderIdentity.harnais.rawValue,
+            quotas: [
+                UsageQuota(
+                    percentRemaining: 62,
+                    quotaType: .timeLimit("Claude · work 5h"),
+                    providerId: ProviderIdentity.claude.rawValue,
+                    resetsAt: Date().addingTimeInterval(2 * 3600),
+                    resetText: "Resets in 2h",
+                    group: "Claude · Work",
+                    compactTitle: "5h",
+                    menuBarTitle: "Claude 5h"
+                ),
+                UsageQuota(
+                    percentRemaining: 81,
+                    quotaType: .timeLimit("Claude · work 7d"),
+                    providerId: ProviderIdentity.claude.rawValue,
+                    resetsAt: Date().addingTimeInterval(4 * 86_400),
+                    resetText: "Resets in 4d",
+                    group: "Claude · Work",
+                    compactTitle: "7d",
+                    menuBarTitle: "Claude 7d"
+                ),
+                UsageQuota(
+                    percentRemaining: 44,
+                    quotaType: .timeLimit("Codex · personal 5h"),
+                    providerId: ProviderIdentity.codex.rawValue,
+                    resetsAt: Date().addingTimeInterval(90 * 60),
+                    resetText: "Resets in 90m",
+                    group: "Codex · Personal",
+                    compactTitle: "5h",
+                    menuBarTitle: "Codex 5h"
+                ),
+                UsageQuota(
+                    percentRemaining: 70,
+                    quotaType: .timeLimit("Codex · personal 7d"),
+                    providerId: ProviderIdentity.codex.rawValue,
+                    resetsAt: Date().addingTimeInterval(5 * 86_400),
+                    resetText: "Resets in 5d",
+                    group: "Codex · Personal",
+                    compactTitle: "7d",
+                    menuBarTitle: "Codex 7d"
+                ),
+                UsageQuota(
+                    percentRemaining: 65,
+                    quotaType: .timeLimit("Cursor · Default Models"),
+                    providerId: ProviderIdentity.cursor.rawValue,
+                    resetsAt: Date().addingTimeInterval(12 * 86_400),
+                    resetText: "Resets in 12d",
+                    group: "Cursor · Default",
+                    compactTitle: "Models",
+                    menuBarTitle: "Cursor Models"
+                ),
+            ],
+            capturedAt: Date(),
+            loginMethod: "Harnais"
+        )
+    )
+
     private static func nextWeekday(_ weekday: Int, hour: Int, minute: Int) -> Date {
         var calendar = Calendar.current
         calendar.firstWeekday = 1

@@ -11,8 +11,8 @@ extension IlesSelfTests {
     static func runComplicationCatalogTests(_ test: TestHarness) async {
         // MARK: Catalog / captions / list IDs
 
-        test.expectEqual(ProviderBrand.allCases.count, 18, "built-in brand count")
-        test.expectEqual(Set(ProviderBrand.allCases.map(\.id)).count, 18, "brand ids are unique")
+        test.expectEqual(ProviderBrand.allCases.count, 19, "built-in brand count")
+        test.expectEqual(Set(ProviderBrand.allCases.map(\.id)).count, 19, "brand ids are unique")
         for brand in ProviderBrand.allCases {
             test.expect(!brand.setupInstruction.isEmpty, "\(brand.title) explains how to connect")
             let resource = brand.iconResource
@@ -43,6 +43,32 @@ extension IlesSelfTests {
             Set(ProviderBrand.allCases.map(\.id)),
             Set(ProviderIdentity.allCases.map(\.rawValue)),
             "brand ids match domain identities"
+        )
+        test.expectEqual(
+            ProviderIdentity.mappedFromHarnais(
+                providerId: "harnais",
+                group: "Claude · work@example.com"
+            ),
+            .claude,
+            "Harnais group titles map to Claude"
+        )
+        test.expectEqual(
+            ProviderIdentity.mappedFromHarnais(
+                providerId: "harnais",
+                label: "quota.key.time:Codex · personal 7d"
+            ),
+            .codex,
+            "Harnais metric ids map to Codex"
+        )
+        test.expectEqual(
+            ProviderIdentity.mappedFromHarnais(providerId: "cursor"),
+            .cursor,
+            "Harnais upstream provider ids stay Cursor"
+        )
+        test.expectEqual(
+            ProviderIdentity.mappedFromHarnais(providerId: "harnais"),
+            nil,
+            "Harnais itself is not an upstream glance brand"
         )
         test.expectEqual(
             AppDefaults.defaultProviderSourceIDs,
@@ -87,6 +113,289 @@ extension IlesSelfTests {
             )
         } else {
             test.expect(false, "Claude demo provider is available")
+        }
+
+        if let demoHarnais = demoProviders.first(where: { $0.id == ProviderIdentity.harnais.rawValue }) {
+            _ = try? await demoHarnais.refresh()
+            let demoSource = ProviderComplicationSource(provider: demoHarnais)
+            let groups = demoSource.currentSnapshot.quotaGroups ?? []
+            test.expectEqual(groups.map(\.title), ["Claude · Work", "Codex · Personal", "Cursor · Default"], "Harnais details group windows by account")
+            test.expect(groups.allSatisfy { !$0.title.contains("@") }, "Harnais groups never include mailboxes")
+            test.expectEqual(groups.first?.metricIDs.count, 2, "Claude work group has two windows")
+            test.expect(
+                demoSource.descriptor.complications.contains { $0.id == "harnais.quota-pair" },
+                "Harnais exposes a combined quota recipe"
+            )
+            let weekly = HarnaisWeeklyStarter.glanceQuotas(in: demoHarnais.snapshot!)
+            test.expectEqual(weekly.count, 3, "Harnais weekly starter keeps one window per account")
+            test.expect(weekly.allSatisfy(\.isAccountGlanceWindow), "Harnais starter skips 5h windows")
+            test.expect(
+                weekly.contains { $0.compactTitle == "Models" },
+                "Harnais starter uses Cursor Models when there is no 7d window"
+            )
+            let weeklyRecipeIDs = weekly.map(HarnaisWeeklyStarter.recipeID(for:))
+            test.expectEqual(
+                weeklyRecipeIDs,
+                [
+                    "harnais.quota-time-claude-work-7d",
+                    "harnais.quota-time-codex-personal-7d",
+                    "harnais.quota-time-cursor-default-models",
+                ],
+                "Harnais weekly starter binds the 7d recipe for each account"
+            )
+            for recipeID in weeklyRecipeIDs {
+                test.expect(
+                    demoSource.descriptor.complications.contains { $0.id == recipeID },
+                    "Harnais catalog includes weekly starter recipe \(recipeID)"
+                )
+            }
+            test.expectEqual(
+                demoSource.descriptor.metrics.first { $0.id == "quota.key.time:Claude · work 7d" }?.name,
+                "Claude · Work · 7d",
+                "Harnais weekly metrics use the account label, not the mailbox"
+            )
+            test.expectEqual(
+                HarnaisGlance.resolvedBrand(
+                    sourceID: ProviderIdentity.harnais.rawValue,
+                    metricIDs: ["quota.key.time:Claude · work 7d"],
+                    descriptor: demoSource.descriptor
+                ),
+                .claude,
+                "Harnais Claude windows use the Claude mark"
+            )
+            test.expectEqual(
+                HarnaisGlance.resolvedBrand(
+                    sourceID: ProviderIdentity.harnais.rawValue,
+                    metricIDs: ["quota.key.time:Codex · personal 7d"],
+                    descriptor: demoSource.descriptor
+                ),
+                .codex,
+                "Harnais Codex windows use the Codex mark"
+            )
+            test.expectEqual(
+                HarnaisGlance.resolvedBrand(
+                    sourceID: ProviderIdentity.harnais.rawValue,
+                    metricIDs: ["quota.key.time:Cursor · Default Models"],
+                    descriptor: demoSource.descriptor
+                ),
+                .cursor,
+                "Harnais Cursor windows use the Cursor mark"
+            )
+            let claudeGroup = demoSource.currentSnapshot.focusedQuotaGroups(
+                matching: ["quota.key.time:Claude · work 7d"]
+            )
+            test.expectEqual(
+                claudeGroup.map(\.title),
+                ["Claude · Work"],
+                "Harnais hover zooms to the hovered account, not the whole feed"
+            )
+            test.expectEqual(claudeGroup.first?.metricIDs.count, 2, "Harnais hover keeps that account's windows")
+            test.expectEqual(
+                demoSource.currentSnapshot.focusedQuotaGroups(
+                    matching: ["missing"]
+                ).count,
+                0,
+                "unknown hover does not dump every account"
+            )
+            test.expectEqual(
+                HarnaisGlance.windowCaption(
+                    metricID: "quota.key.time:Claude · work 7d",
+                    metricName: "Claude · Work · 7d"
+                ),
+                "Weekly",
+                "Harnais hover rows use the window, not the mailbox"
+            )
+            let glanceRecipes = HarnaisWeeklyStarter.glanceRecipes(
+                in: demoHarnais.snapshot!,
+                descriptor: demoSource.descriptor
+            )
+            test.expectEqual(glanceRecipes.count, 3, "Harnais starter recipes match the demo accounts")
+            let emptyIsland = IslandConfiguration(name: "Empty")
+            test.expectEqual(
+                HarnaisWeeklyStarter.missingRecipes(
+                    on: emptyIsland,
+                    snapshot: demoHarnais.snapshot!,
+                    descriptor: demoSource.descriptor
+                ).count,
+                0,
+                "empty islands do not get Harnais glances injected"
+            )
+            let oneRing = IslandConfiguration(
+                name: "One",
+                complications: [
+                    ComplicationConfiguration(
+                        recipeID: glanceRecipes[0].id,
+                        sourceID: glanceRecipes[0].sourceID,
+                        metricIDs: glanceRecipes[0].metricIDs,
+                        family: glanceRecipes[0].family,
+                        labelStyle: glanceRecipes[0].labelStyle
+                    )
+                ]
+            )
+            test.expectEqual(
+                HarnaisWeeklyStarter.missingRecipes(
+                    on: oneRing,
+                    snapshot: demoHarnais.snapshot!,
+                    descriptor: demoSource.descriptor
+                ).count,
+                0,
+                "a single Harnais ring is not treated as the weekly collection"
+            )
+            var followingOne = oneRing
+            followingOne.followsHarnaisAccounts = true
+            test.expectEqual(HarnaisWeeklyStarter.missingRecipes(on: followingOne, snapshot: demoHarnais.snapshot!,
+                descriptor: demoSource.descriptor).count, 2, "explicit account following works even when an island starts with one account")
+            let partialIsland = IslandConfiguration(
+                name: "Stack",
+                followsHarnaisAccounts: true,
+                complications: glanceRecipes.prefix(2).map { recipe in
+                    ComplicationConfiguration(
+                        recipeID: recipe.id,
+                        sourceID: recipe.sourceID,
+                        metricIDs: recipe.metricIDs,
+                        family: recipe.family,
+                        labelStyle: recipe.labelStyle
+                    )
+                }
+            )
+            test.expectEqual(
+                HarnaisWeeklyStarter.missingRecipes(
+                    on: partialIsland,
+                    snapshot: demoHarnais.snapshot!,
+                    descriptor: demoSource.descriptor
+                ).map(\.id),
+                [glanceRecipes[2].id],
+                "existing Harnais weekly stacks pick up Cursor Models"
+            )
+            let outOfOrder = IslandConfiguration(
+                name: "Out of order",
+                followsHarnaisAccounts: true,
+                complications: [glanceRecipes[0], glanceRecipes[2]].map { recipe in
+                    ComplicationConfiguration(
+                        recipeID: recipe.id,
+                        sourceID: recipe.sourceID,
+                        metricIDs: recipe.metricIDs,
+                        family: recipe.family,
+                        labelStyle: recipe.labelStyle
+                    )
+                }
+            )
+            var customIsland = partialIsland
+            customIsland.followsHarnaisAccounts = false
+            test.expect(HarnaisWeeklyStarter.missingRecipes(on: customIsland, snapshot: demoHarnais.snapshot!,
+                descriptor: demoSource.descriptor).isEmpty, "custom account islands never expand back into a full starter stack")
+            customIsland.followsHarnaisAccounts = nil
+            test.expect(HarnaisWeeklyStarter.missingRecipes(on: customIsland, snapshot: demoHarnais.snapshot!,
+                descriptor: demoSource.descriptor).isEmpty, "legacy layouts without an explicit follow preference stay unchanged")
+            let inserted = HarnaisWeeklyStarter.missingRecipes(
+                on: outOfOrder,
+                snapshot: demoHarnais.snapshot!,
+                descriptor: demoSource.descriptor
+            )
+            test.expectEqual(inserted.map(\.id), [glanceRecipes[1].id], "gap in the weekly stack is the missing Codex glance")
+            test.expectEqual(
+                HarnaisWeeklyStarter.insertionIndex(
+                    for: glanceRecipes[1],
+                    on: outOfOrder,
+                    wanted: glanceRecipes
+                ),
+                1,
+                "missing Harnais glances insert in account order"
+            )
+            let live = HarnaisWeeklyStarter.liveNamedRecipes(
+                in: demoHarnais.snapshot!,
+                descriptor: demoSource.descriptor
+            )
+            test.expect(
+                live.contains { $0.id == glanceRecipes[0].id },
+                "live named recipes include the Claude weekly glance"
+            )
+            let work = glanceRecipes[0]
+            let drifted = IslandConfiguration(
+                name: "Drifted",
+                complications: [
+                    ComplicationConfiguration(
+                        recipeID: work.id,
+                        sourceID: work.sourceID,
+                        metricIDs: ["quota.key.time:Claude · Work 7d"],
+                        family: work.family,
+                        labelStyle: work.labelStyle
+                    )
+                ]
+            )
+            test.expectEqual(
+                HarnaisWeeklyStarter.rebindPairs(on: drifted, live: live).map(\.recipe.metricIDs),
+                [work.metricIDs],
+                "Harnais rings whose type key casing drifted keep the same recipe"
+            )
+            let perso = IslandConfiguration(
+                name: "Renamed",
+                complications: [
+                    ComplicationConfiguration(
+                        recipeID: "harnais.quota-time-claude-perso-7d",
+                        sourceID: HarnaisWeeklyStarter.sourceID,
+                        metricIDs: ["quota.key.time:Claude · Perso 7d"],
+                        family: .ring,
+                        labelStyle: .percentage
+                    ),
+                    ComplicationConfiguration(
+                        recipeID: glanceRecipes[1].id,
+                        sourceID: glanceRecipes[1].sourceID,
+                        metricIDs: glanceRecipes[1].metricIDs,
+                        family: glanceRecipes[1].family,
+                        labelStyle: glanceRecipes[1].labelStyle
+                    )
+                ]
+            )
+            test.expectEqual(
+                HarnaisWeeklyStarter.rebindPairs(on: perso, live: live),
+                [],
+                "a missing account never rebinds to another account with the same provider and window"
+            )
+            var customPair = perso
+            customPair.complications[0].recipeID = nil
+            customPair.complications[0].family = .dualRing
+            customPair.complications[0].metricIDs = ["quota.key.time:Claude · Perso 5h", "quota.key.time:Claude · Perso 7d"]
+            test.expectEqual(HarnaisWeeklyStarter.rebindPairs(on: customPair, live: live), [],
+                "a temporarily missing custom pair keeps both saved metric slots")
+            let orphaned = IslandConfiguration(
+                name: "Orphan",
+                complications: [
+                    ComplicationConfiguration(
+                        recipeID: "harnais.quota-time-claude-perso-7d",
+                        sourceID: HarnaisWeeklyStarter.sourceID,
+                        metricIDs: ["quota.key.time:Claude · Perso 7d"],
+                        family: .ring,
+                        labelStyle: .percentage
+                    ),
+                    ComplicationConfiguration(
+                        recipeID: work.id,
+                        sourceID: work.sourceID,
+                        metricIDs: work.metricIDs,
+                        family: work.family,
+                        labelStyle: work.labelStyle
+                    ),
+                    ComplicationConfiguration(
+                        recipeID: glanceRecipes[1].id,
+                        sourceID: glanceRecipes[1].sourceID,
+                        metricIDs: glanceRecipes[1].metricIDs,
+                        family: glanceRecipes[1].family,
+                        labelStyle: glanceRecipes[1].labelStyle
+                    )
+                ]
+            )
+            test.expectEqual(
+                HarnaisWeeklyStarter.rebindPairs(on: orphaned, live: live).map(\.recipe.id),
+                [],
+                "an extra Claude weekly is not stolen from a still-published Work ring"
+            )
+            test.expectEqual(
+                HarnaisWeeklyStarter.rebindPairs(on: perso, live: []),
+                [],
+                "an empty Harnais feed does not retarget rings"
+            )
+        } else {
+            test.expect(false, "Harnais demo provider is available")
         }
 
         do {
@@ -204,7 +513,7 @@ extension IlesSelfTests {
             let recipes = descriptors.flatMap(\.complications)
             test.expectEqual(
                 recipes.count,
-                88,
+                92,
                 "first-party launch catalog recipe count (update README when this changes)"
             )
             let scopedRecipeIDs = descriptors.flatMap { descriptor in
@@ -667,6 +976,23 @@ extension IlesSelfTests {
         test.expectEqual(changedFamily.metricIDs.count, 1, "single-metric families discard extra metrics")
         test.expect(changedFamily.slotTints.isEmpty, "single-metric families discard unused slot colors")
         test.expectEqual(changedFamily.slotValueModes, [.remaining], "single-metric families discard unused value modes")
+        test.expectEqual(
+            ComplicationValueMode.remainingDefaults(
+                sourceID: "claude",
+                metricIDs: ["quota.session", "quota.weekly"],
+                family: .dualRing
+            ),
+            [.remaining, .remaining],
+            "new quota rings default to remaining"
+        )
+        test.expect(
+            ComplicationValueMode.remainingDefaults(
+                sourceID: "system.mac",
+                metricIDs: ["cpu"],
+                family: .ring
+            ).isEmpty,
+            "non-quota rings keep the used decode fallback"
+        )
 
         do {
             let json = Data("""
@@ -774,6 +1100,162 @@ extension IlesSelfTests {
             test.expect(abs((snapshot.quota(for: CursorQuotaPool.other)?.percentUsed ?? -1) - 91) < 0.01, "message Other Models")
         } catch {
             test.expect(false, "message-only parse: \(error)")
+        }
+
+        do {
+            let json = Data("""
+            {
+              "schemaVersion": 1,
+              "capturedAt": "2026-09-13T12:00:00Z",
+              "accounts": [
+                {
+                  "id": "a1",
+                  "provider": "claude",
+                  "label": "Work",
+                  "email": "work@example.com",
+                  "quotas": [
+                    {
+                      "type": "time:Claude · work 5h",
+                      "percentRemaining": 62,
+                      "resetsAt": "2026-09-13T14:00:00Z",
+                      "resetText": "Resets in 2h",
+                      "group": "Claude · work@example.com",
+                      "compactTitle": "5h",
+                      "menuBarTitle": "Claude 5h"
+                    }
+                  ]
+                },
+                {
+                  "id": "a2",
+                  "provider": "codex",
+                  "label": "Personal",
+                  "quotas": [
+                    {
+                      "type": "time:Codex · personal 5h",
+                      "percentRemaining": 44
+                    }
+                  ]
+                }
+              ]
+            }
+            """.utf8)
+            let snapshot = try HarnaisUsageProbe.parse(json)
+            test.expectEqual(snapshot.quotas.count, 2, "Harnais feed maps one quota per window")
+            test.expectEqual(snapshot.quotas[0].group, "Claude · Work", "Harnais groups use the account label, not the mailbox")
+            test.expectEqual(snapshot.quotas[0].providerId, "claude", "Harnais windows keep the upstream provider")
+            test.expectEqual(snapshot.quotas[0].quotaType, .timeLimit("Claude · work 5h"), "Harnais type keys stay time windows")
+            test.expectEqual(snapshot.quotas[0].compactTitle, "5h", "Harnais compact titles survive decode")
+            test.expectEqual(snapshot.quotas[1].group, "Codex · Personal", "Harnais fills a group from provider and label")
+            test.expectEqual(snapshot.quotas[1].providerId, "codex", "Harnais Codex windows keep the upstream provider")
+            test.expect(snapshot.quotas.allSatisfy { $0.group?.contains("@") != true }, "parsed Harnais groups never include mailboxes")
+            test.expectEqual(snapshot.accountEmail, nil, "Harnais snapshots never copy mailboxes")
+            let hiddenSnapshot = try HarnaisUsageProbe.parse(json, hiddenTypes: ["time:Claude · work 5h"])
+            test.expectEqual(hiddenSnapshot.quotas.count, 2, "visibility preserves all quota definitions")
+            test.expectEqual(hiddenSnapshot.hiddenQuotaTypes, ["time:Claude · work 5h"], "native Harnais carries visibility separately")
+            let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: directory) }
+            let feedURL = directory.appendingPathComponent("quotas.json")
+            let preferencesURL = directory.appendingPathComponent("islands.json")
+            try json.write(to: feedURL)
+            let liveJSON = String(decoding: json, as: UTF8.self).replacingOccurrences(
+                of: "2026-09-13T12:00:00Z", with: ISO8601DateFormatter().string(from: Date())
+            )
+            let executor = RecordingCLIExecutor(result: CLIResult(output: liveJSON))
+            let probe = HarnaisUsageProbe(configurationDirectory: directory, executor: executor)
+            let withoutPreferences = try await probe.probe()
+            test.expect(withoutPreferences.hiddenQuotaTypes.isEmpty, "missing visibility file defaults to visible")
+            try Data(#"{"schemaVersion":1,"hiddenTypes":["time:Claude · work 5h"]}"#.utf8).write(to: preferencesURL)
+            let withPreferences = try await probe.probe()
+            test.expectEqual(withPreferences.hiddenQuotaTypes, hiddenSnapshot.hiddenQuotaTypes, "probe reads preferences beside its feed")
+            test.expectEqual(withPreferences.quotas, withoutPreferences.quotas, "reading visibility never drops quota data")
+            try Data("invalid".utf8).write(to: preferencesURL)
+            do {
+                _ = try await probe.probe()
+                test.expect(false, "invalid visibility must not silently enable hidden rings")
+            } catch {
+                test.expect(true, "invalid visibility fails the read and preserves the prior provider snapshot")
+            }
+
+
+        } catch {
+            test.expect(false, "Harnais quotas.json parse: \(error)")
+        }
+
+        do {
+            let json = Data("""
+            {
+              "schemaVersion": 1,
+              "capturedAt": "2026-09-13T12:00:00.250Z",
+              "accounts": [
+                {
+                  "id": "c1",
+                  "provider": "cursor",
+                  "label": "Default",
+                  "quotas": [
+                    {
+                      "type": "time:Cursor · Default Models",
+                      "percentRemaining": 65
+                    }
+                  ]
+                }
+              ]
+            }
+            """.utf8)
+            let snapshot = try HarnaisUsageProbe.parse(json)
+            test.expectEqual(snapshot.quotas.count, 1, "fractional capturedAt still parses")
+            test.expect(snapshot.quotas[0].isAccountGlanceWindow, "Cursor Models is a glance window without compactTitle")
+            test.expectEqual(snapshot.quotas[0].windowKind, .models, "Cursor Models type names map to Models")
+        } catch {
+            test.expect(false, "Harnais fractional date parse: \(error)")
+        }
+
+        do {
+            let json = Data("""
+            {
+              "capturedAt": "2026-09-13T12:00:00Z",
+              "accounts": [
+                {
+                  "id": "bad",
+                  "provider": "claude",
+                  "label": "Work",
+                  "error": "session expired",
+                  "quotas": []
+                }
+              ]
+            }
+            """.utf8)
+            _ = try HarnaisUsageProbe.parse(json)
+            test.expect(false, "Harnais should fail when every account is an error")
+        } catch ProbeError.executionFailed(let message) {
+            test.expectEqual(message, "session expired", "Harnais surfaces the account error")
+        } catch {
+            test.expect(false, "Harnais account error: \(error)")
+        }
+
+        do {
+            let models = UsageQuota(
+                percentRemaining: 40,
+                quotaType: .timeLimit("Cursor · Default Models"),
+                providerId: "cursor"
+            )
+            let weekly = UsageQuota(
+                percentRemaining: 80,
+                quotaType: .timeLimit("Claude · work 7d"),
+                providerId: "claude",
+                compactTitle: "7d"
+            )
+            let session = UsageQuota(
+                percentRemaining: 10,
+                quotaType: .timeLimit("Claude · work 5h"),
+                providerId: "claude",
+                compactTitle: "5h"
+            )
+            test.expectEqual(models.windowKind, .models, "Models token from the type name")
+            test.expect(models.isAccountGlanceWindow, "Models is an account glance")
+            test.expectEqual(weekly.windowKind, .weekly, "compact 7d is weekly")
+            test.expectEqual(session.windowKind, .session, "compact 5h is session")
+            test.expect(!session.isAccountGlanceWindow, "5h is not the account glance")
         }
 
     }

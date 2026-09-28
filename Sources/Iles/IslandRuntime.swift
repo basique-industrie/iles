@@ -68,6 +68,7 @@ final class IslandRuntime {
     let sessionMonitor: SessionMonitor
     let sourceRegistry: ComplicationSourceRegistry
 
+    var settingsSection: SettingsSection = .overview
     var selection: ComplicationSelection?
     var isWindowPinned = false
     var pointerOverPopover = false
@@ -120,7 +121,11 @@ final class IslandRuntime {
         self.powerStateProvider = powerStateProvider
         let sessions = SessionMonitor()
         sessionMonitor = sessions
-        sourceRegistry = ComplicationSourceRegistry(providers: providers, sessionMonitor: sessions)
+        sourceRegistry = ComplicationSourceRegistry(
+            providers: providers,
+            sessionMonitor: sessions,
+            includeLegacyBattery: workspaceStore.workspace.referencedSourceIDs.contains("system.battery")
+        )
         workspaceStore.onWorkspaceChange = { [weak self] in
             self?.workspaceDidChange()
         }
@@ -138,8 +143,31 @@ final class IslandRuntime {
         return island.complications.first { $0.id == selection.complicationID }
     }
 
+    /// AI sources are drawn from saved islands, including hidden islands and rings.
+    /// Keep the full registry intact so reducing the catalog never removes configuration.
+    var catalogSources: [ComplicationSourceDescriptor] {
+        let used = Set(workspaceStore.islands.flatMap(\.complications).map(\.sourceID))
+        return sourceRegistry.descriptors.filter {
+            $0.kind != .usage || used.contains($0.id)
+                || ($0.id == HarnaisWeeklyStarter.sourceID && provider(id: $0.id)?.snapshot != nil)
+        }
+    }
+
     var referencedSourceIDs: [String] {
         Array(Set(workspaceStore.visibleIslands.flatMap(\.visibleComplications).map(\.sourceID))).sorted()
+    }
+
+    func isHiddenBySource(_ complication: ComplicationConfiguration) -> Bool {
+        guard complication.sourceID == HarnaisWeeklyStarter.sourceID,
+              let snapshot = provider(id: complication.sourceID)?.snapshot,
+              !complication.metricIDs.isEmpty else { return false }
+        return complication.metricIDs.contains { metricID in
+            snapshot.hiddenQuotaTypes.contains { metricID == "quota.key.\($0)" }
+        }
+    }
+
+    func visibleComplications(on island: IslandConfiguration) -> [ComplicationConfiguration] {
+        island.visibleComplications.filter { !isHiddenBySource($0) }
     }
 
     func start() {
@@ -160,7 +188,13 @@ final class IslandRuntime {
             configRepository: JSONExtensionConfigRepository(settingsStore: .shared)
         ).makeProviders()
         guard !extras.isEmpty else { return }
+        let firstPartyHarnaisID = ProviderIdentity.harnais.rawValue
+        let harnaisExtensionID = "ext-\(firstPartyHarnaisID)"
         for provider in extras where !allProviders.contains(where: { $0.id == provider.id }) {
+            if provider.id == harnaisExtensionID,
+               allProviders.contains(where: { $0.id == firstPartyHarnaisID }) {
+                continue
+            }
             allProviders.append(provider)
             sourceRegistry.register(provider: provider)
         }
@@ -199,6 +233,27 @@ final class IslandRuntime {
     }
 
     func applyRefreshInterval() {
+        restartBackgroundMonitor()
+    }
+
+    func applyHarnaisOverlap() {
+        let settings = JSONSettingsRepository.shared
+        let builtins = IslandProviders.makeAll(demo: usesDemoData, settings: settings)
+        let existingByID = Dictionary(uniqueKeysWithValues: allProviders.map { ($0.id, $0) })
+        let extras = allProviders.filter { $0 is ExtensionProvider }
+        let mergedBuiltins = builtins.map { existingByID[$0.id] ?? $0 }
+        let nextIDs = Set(mergedBuiltins.map(\.id)).union(extras.map(\.id))
+        for provider in allProviders where !nextIDs.contains(provider.id) {
+            sourceRegistry.unregister(id: provider.id)
+            snapshotBoxes[provider.id] = nil
+        }
+        for provider in mergedBuiltins where existingByID[provider.id] == nil {
+            sourceRegistry.register(provider: provider)
+        }
+        allProviders = mergedBuiltins + extras.filter { extra in
+            !mergedBuiltins.contains(where: { $0.id == extra.id })
+        }
+        seedCurrentSnapshots()
         restartBackgroundMonitor()
     }
 
@@ -242,7 +297,11 @@ final class IslandRuntime {
     }
 
     func values(for complication: ComplicationConfiguration) -> [ComplicationValue] {
-        resolvedSlots(for: complication).map(\.value)
+        let slots = slotValues(for: complication)
+        guard slots.contains(where: { $0.value != nil }) else { return [] }
+        // Keep absent slots in place: an inner-ring reading must never become
+        // the outer-ring reading when a provider omits one metric.
+        return slots.map { $0.value ?? .value("—", unit: nil) }
     }
 
     func trendDirection(for complication: ComplicationConfiguration) -> ComplicationTrendDirection {
@@ -279,6 +338,14 @@ final class IslandRuntime {
     func resolvedSlots(
         for complication: ComplicationConfiguration
     ) -> [(metricID: String, value: ComplicationValue)] {
+        slotValues(for: complication).compactMap { slot in
+            slot.value.map { (slot.metricID, $0) }
+        }
+    }
+
+    private func slotValues(
+        for complication: ComplicationConfiguration
+    ) -> [(metricID: String, value: ComplicationValue?)] {
         guard let source = snapshot(sourceID: complication.sourceID) else { return [] }
         if let recipeID = complication.recipeID,
            let recipe = sourceRegistry.recipe(id: recipeID, sourceID: complication.sourceID) {
@@ -288,27 +355,28 @@ final class IslandRuntime {
             let context = needsHistory
                 ? history.context(sourceID: complication.sourceID, before: source.capturedAt)
                 : ComplicationTransformContext()
-            return recipe.slots.enumerated().compactMap { index, slot in
-                ComplicationTransformEngine.resolve(
+            return recipe.slots.enumerated().map { index, slot in
+                let value = ComplicationTransformEngine.resolve(
                     slot: slot,
                     snapshot: source,
                     context: context
-                ).map {
-                    (
-                        slot.metricID,
-                        ComplicationTransformEngine.present($0, as: complication.valueMode(at: index))
-                    )
-                }
+                ).map { ComplicationTransformEngine.present($0, as: complication.valueMode(at: index)) }
+                return (slot.metricID, value)
             }
         }
-        return complication.metricIDs.enumerated().compactMap { index, metricID in
-            source.values[metricID].map {
-                (
-                    metricID,
-                    ComplicationTransformEngine.present($0, as: complication.valueMode(at: index))
-                )
+        return complication.metricIDs.enumerated().map { index, metricID in
+            let value = source.values[metricID].map {
+                ComplicationTransformEngine.present($0, as: complication.valueMode(at: index))
             }
+            return (metricID, value)
         }
+    }
+
+    var harnaisStaleAfter: TimeInterval {
+        HarnaisRefreshPolicy.staleAfter(
+            interval: JSONSettingsRepository.shared.refreshInterval(),
+            onBattery: powerStateProvider?.isOnBattery == true
+        )
     }
 
     func quality(for complication: ComplicationConfiguration) -> ComplicationSampleQuality {
@@ -317,15 +385,24 @@ final class IslandRuntime {
             return snapshot.quality
         }
         if snapshot.errorDescription != nil, snapshot.values.isEmpty { return .failed }
-        if resolvedSlots(for: complication).isEmpty { return .unavailable }
+        let slots = slotValues(for: complication)
+        if slots.isEmpty || slots.contains(where: { $0.value == nil }) { return .unavailable }
         guard let descriptor = descriptor(sourceID: complication.sourceID) else { return snapshot.quality }
         let staleLimits = complication.metricIDs.compactMap { metricID in
             descriptor.metrics.first { $0.id == metricID }?.policy.staleAfter
         }
-        if let limit = staleLimits.min(), Date().timeIntervalSince(snapshot.capturedAt) > limit {
-            return .stale
-        }
+        let limit = complication.sourceID == HarnaisWeeklyStarter.sourceID ? harnaisStaleAfter : staleLimits.min()
+        if let limit, Date().timeIntervalSince(snapshot.capturedAt) > limit { return .stale }
         return snapshot.quality
+    }
+
+    func editSelectedWidget() {
+        guard let selection else { return }
+        workspaceStore.selectIsland(selection.islandID)
+        workspaceStore.selectedComplicationID = selection.complicationID
+        settingsSection = .islands
+        dismissWindow()
+        NotificationCenter.default.post(name: .showIslandSettings, object: nil)
     }
 
     func handleTap(islandID: UUID, complication: ComplicationConfiguration) {
@@ -404,11 +481,26 @@ final class IslandRuntime {
     /// Startup must not depend on the first periodic monitor tick. Provider
     /// descriptors are snapshot-backed, so delaying this refresh also leaves
     /// their complication catalogs and style choices empty after launch.
+    ///
+    /// Harnais is included even when it is not on an island so configured
+    /// accounts are available in the catalog before the first widget is added.
     private func startInitialRefresh() {
         refreshTask?.cancel()
         refreshTask = Task { [weak self] in
-            await self?.refreshSources(kind: .interactive)
+            guard let self else { return }
+            await self.refreshSources(ids: self.initialRefreshSourceIDs, kind: .interactive)
         }
+    }
+
+    var initialRefreshSourceIDs: [String] {
+        var ids = referencedSourceIDs
+        let harnaisID = ProviderIdentity.harnais.rawValue
+        if !usesDemoData,
+           allProviders.contains(where: { $0.id == harnaisID }),
+           !ids.contains(harnaisID) {
+            ids.append(harnaisID)
+        }
+        return ids
     }
 
     private func restartBackgroundMonitor() {
@@ -448,7 +540,7 @@ final class IslandRuntime {
         }
     }
 
-    /// Provider refresh is user-configurable and may be off. Clock, battery,
+    /// Provider refresh is user-configurable and may be off. Clock,
     /// and active-session values still need a lightweight local cadence.
     private func restartLocalMonitor() {
         localMonitorTask?.cancel()
@@ -542,8 +634,54 @@ final class IslandRuntime {
 
     private func publish(_ snapshot: SourceSnapshot, sourceID: String) {
         let box = snapshotBox(for: sourceID)
-        guard box.value != snapshot else { return }
-        box.value = snapshot
+        if box.value != snapshot {
+            box.value = snapshot
+        }
+        if sourceID == HarnaisWeeklyStarter.sourceID {
+            reconcileHarnaisGlances()
+        }
+    }
+
+    private func reconcileHarnaisGlances() {
+        guard let snapshot = provider(id: HarnaisWeeklyStarter.sourceID)?.snapshot,
+              let descriptor = descriptor(sourceID: HarnaisWeeklyStarter.sourceID)
+        else { return }
+        let wanted = HarnaisWeeklyStarter.glanceRecipes(in: snapshot, descriptor: descriptor)
+        let live = HarnaisWeeklyStarter.liveNamedRecipes(in: snapshot, descriptor: descriptor)
+        for islandID in workspaceStore.visibleIslands.map(\.id) {
+            guard var island = workspaceStore.island(id: islandID) else { continue }
+            if !live.isEmpty {
+                let rebinds = HarnaisWeeklyStarter.rebindPairs(on: island, live: live)
+                for rebind in rebinds {
+                    workspaceStore.updateComplication(rebind.complicationID, in: islandID) { item in
+                        item.recipeID = rebind.recipe.id
+                        item.metricIDs = rebind.recipe.metricIDs
+                    }
+                }
+                // Missing quotas can be a temporary provider failure. Retain the saved layout.
+                island = workspaceStore.island(id: islandID) ?? island
+            }
+            let missing = HarnaisWeeklyStarter.missingRecipes(
+                on: island,
+                snapshot: snapshot,
+                descriptor: descriptor
+            )
+            guard !missing.isEmpty else { continue }
+            let capacity = IslandMetrics.maxProviderCount(
+                forHeight: IslandMetrics.maximumHeight(
+                    visibleFrameHeight: NSScreen.main?.visibleFrame.height ?? 900
+                )
+            )
+            let room = max(0, capacity - island.visibleComplications.count)
+            guard room > 0 else { continue }
+            workspaceStore.addComplications(
+                to: islandID,
+                recipes: Array(missing.prefix(room)),
+                insertionIndex: { recipe, current in
+                    HarnaisWeeklyStarter.insertionIndex(for: recipe, on: current, wanted: wanted)
+                }
+            )
+        }
     }
 
     private func reconcileHover() {

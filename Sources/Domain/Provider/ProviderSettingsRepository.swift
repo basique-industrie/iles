@@ -210,17 +210,14 @@ public protocol AlibabaSettingsRepository: ProviderSettingsRepository {
     /// Sets the API region
     func setAlibabaRegion(_ region: AlibabaRegion)
 
-    /// Gets the cookie source (auto from browser or manual)
-    func alibabaCookieSource() -> AlibabaCookieSource
-
-    /// Sets the cookie source
-    func setAlibabaCookieSource(_ source: AlibabaCookieSource)
-
     /// Saves a manually entered cookie string
     func saveAlibabaManualCookie(_ cookie: String)
 
     /// Retrieves the manually entered cookie string
     func getAlibabaManualCookie() -> String?
+
+    /// Deletes the manually entered cookie string
+    func deleteAlibabaManualCookie()
 
     /// Saves the Alibaba API key
     func saveAlibabaApiKey(_ key: String)

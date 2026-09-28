@@ -8,15 +8,15 @@ struct IslandPlacementBadge: View {
 
   var body: some View {
     ZStack {
-      RoundedRectangle(cornerRadius: 4, style: .continuous)
+      RoundedRectangle(cornerRadius: 6, style: .continuous)
         .strokeBorder(IslandChrome.controlBorder, lineWidth: 1)
         .frame(width: 18, height: 23)
       Capsule(style: .continuous)
-        .fill(isVisible ? Color.white : IslandChrome.tertiaryText)
+        .fill(isVisible ? IslandChrome.text : IslandChrome.tertiaryText)
         .frame(width: 4, height: 13)
         .offset(x: edge == .leading ? -9 : 9)
       Image(systemName: edge == .leading ? "arrow.left" : "arrow.right")
-        .font(.system(size: 7, weight: .bold))
+        .font(.system(size: 11, weight: .bold))
         .foregroundStyle(IslandChrome.tertiaryText)
         .offset(x: edge == .leading ? 3 : -3)
     }
@@ -50,12 +50,12 @@ struct RowActionGlyph: View {
 
   var body: some View {
     Image(systemName: symbol)
-      .font(.system(size: 10, weight: .semibold))
-      .foregroundStyle(isHovering ? Color.white : IslandChrome.secondaryText)
+      .font(.system(size: 12, weight: .semibold))
+      .foregroundStyle(isHovering ? IslandChrome.text : IslandChrome.secondaryText)
       .frame(width: 28, height: 28)
       .background(
         isHovering ? IslandChrome.hoverFill : Color.clear,
-        in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+        in: RoundedRectangle(cornerRadius: 8, style: .continuous)
       )
       .onHover { isHovering = $0 }
       .animation(.easeOut(duration: 0.12), value: isHovering)
@@ -80,7 +80,7 @@ private struct DestructiveSwipeActionModifier: ViewModifier {
             .foregroundStyle(.white)
             .frame(width: actionWidth, height: actionHeight)
             .contentShape(Rectangle())
-            .background(Color.red.opacity(0.92))
+            .background(IslandChrome.error)
             .overlay(alignment: .bottom) {
               if showsSeparator {
                 Rectangle()

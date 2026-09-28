@@ -11,10 +11,7 @@ internal struct GeminiProjectRepository {
 
     /// gemini-cli's bootstrap endpoint. Returns the user's `cloudaicompanionProject`
     /// (the project ID required for accurate per-user quota on the personal-OAuth
-    /// "Gemini Code Assist" tier). The previous implementation called
-    /// `cloudresourcemanager.googleapis.com/v1/projects` which fails for users
-    /// without a GCP account, leaving the quota request projectless and the API
-    /// returning dummy 100% buckets.
+    /// "Gemini Code Assist" tier).
     private static let loadCodeAssistEndpoint = "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist"
 
     init(

@@ -87,16 +87,12 @@ private struct RawQuota: Codable {
     let resetsAt: Date?
     let resetText: String?
     let dollarRemaining: Double?
+    let group: String?
+    let compactTitle: String?
+    let menuBarTitle: String?
 
     func toUsageQuota(providerId: String) -> UsageQuota {
-        let quotaType: QuotaType = switch type {
-        case "session": .session
-        case "weekly": .weekly
-        case let t where t.hasPrefix("model:"):
-            .modelSpecific(String(t.dropFirst(6)))
-        default:
-            .timeLimit(type)
-        }
+        let quotaType = QuotaType(quotaKey: type) ?? .timeLimit(type)
 
         return UsageQuota(
             percentRemaining: percentRemaining,
@@ -104,7 +100,10 @@ private struct RawQuota: Codable {
             providerId: providerId,
             resetsAt: resetsAt,
             resetText: resetText,
-            dollarRemaining: dollarRemaining.map { Decimal($0) }
+            dollarRemaining: dollarRemaining.map { Decimal($0) },
+            group: group,
+            compactTitle: compactTitle,
+            menuBarTitle: menuBarTitle
         )
     }
 }

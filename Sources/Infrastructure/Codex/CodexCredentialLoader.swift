@@ -54,7 +54,6 @@ public struct CodexCredentialLoader: Sendable {
 
     /// Loads credentials from `~/.codex/auth.json`.
     /// Returns nil if no valid OAuth credentials are found.
-    /// Note: API key auth (`OPENAI_API_KEY`) is not supported for usage API.
     public func loadCredentials() -> CodexCredentialResult? {
         let path = authFilePath
         guard FileManager.default.fileExists(atPath: path) else {

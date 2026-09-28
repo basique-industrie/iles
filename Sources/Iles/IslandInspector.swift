@@ -41,8 +41,16 @@ struct IslandInspector: View {
 
     private var identity: some View {
         SettingsGroup(title: "Identity") {
-            IslandTextField(title: "Name", text: name, prompt: "Main Island") {}
+            IslandNameEditor(store: runtime.workspaceStore, island: island)
+                .id(island.id)
             SettingsToggleRow(title: "Visible", isOn: visibility)
+            if island.complications.contains(where: { $0.sourceID == HarnaisWeeklyStarter.sourceID }) {
+                SettingsToggleRow(title: "Include new Harnais accounts", isOn: Binding(
+                    get: { island.followsHarnaisAccounts == true },
+                    set: { value in runtime.workspaceStore.updateIsland(island.id) { $0.followsHarnaisAccounts = value } }
+                ))
+                SettingsCaption(text: "Removing a Harnais widget turns off automatic additions for this island.")
+            }
         }
     }
 
@@ -57,19 +65,21 @@ struct IslandInspector: View {
             if island.placement.mode == .manual {
                 HStack {
                     Text("Top spacing")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(IslandChrome.secondaryText)
                     Spacer()
                     Text("\(Int(topGap.wrappedValue)) pt")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(IslandChrome.text)
                         .monospacedDigit()
                 }
                 SettingsSlider(
                     value: topGap,
-                    range: 8...600,
+                    range: topGapRange,
                     onEditingChanged: topGapEditingChanged
                 )
+                .accessibilityLabel("Top spacing")
+                .accessibilityValue("\(Int(topGap.wrappedValue)) points")
             }
         }
     }
@@ -102,10 +112,6 @@ struct IslandInspector: View {
         .help("Choose which display hosts this island")
     }
 
-    private var name: Binding<String> {
-        Binding(get: { island.name }, set: { value in runtime.workspaceStore.updateIsland(island.id) { $0.name = value } })
-    }
-
     private var visibility: Binding<Bool> {
         Binding(get: { island.isVisible }, set: { value in runtime.workspaceStore.updateIsland(island.id) { $0.isVisible = value } })
     }
@@ -122,9 +128,25 @@ struct IslandInspector: View {
         Binding(get: { island.placement.mode }, set: { value in runtime.workspaceStore.updateIsland(island.id) { $0.placement.mode = value } })
     }
 
+    private var topGapRange: ClosedRange<Double> {
+        let screen: NSScreen?
+        switch island.placement.display {
+        case .main: screen = NSScreen.main
+        case .display(let identifier):
+            screen = NSScreen.screens.enumerated().first {
+                screenIdentifier($0.element, fallback: $0.offset) == identifier
+            }?.element ?? NSScreen.main
+        }
+        let visibleHeight = screen?.visibleFrame.height ?? 900
+        let maximumHeight = IslandMetrics.maximumHeight(visibleFrameHeight: visibleHeight)
+        let height = min(IslandMetrics.height(forProviderCount: runtime.visibleComplications(on: island).count), maximumHeight)
+        let maximumGap = IslandPlacement.clampedTopGap(.greatestFiniteMagnitude, islandHeight: height, visibleHeight: visibleHeight)
+        return Double(IslandMetrics.topGap)...max(Double(IslandMetrics.topGap), Double(maximumGap))
+    }
+
     private var topGap: Binding<Double> {
         Binding(
-            get: { topGapDraft ?? island.placement.topGap },
+            get: { min(max(topGapDraft ?? island.placement.topGap, topGapRange.lowerBound), topGapRange.upperBound) },
             set: { value in
                 topGapDraft = value
                 runtime.previewIslandTopGap(island.id, value: value)
@@ -161,5 +183,49 @@ struct IslandInspector: View {
             }
             return "Saved Display"
         }
+    }
+}
+
+/// Keep partially typed names out of the store: its normalization is appropriate
+/// when saving, but trims spaces and replaces empty text during live editing.
+private struct IslandNameEditor: View {
+    let store: IslandWorkspaceStore
+    let island: IslandConfiguration
+    @State private var draft: String
+    @State private var savedName: String
+
+    init(store: IslandWorkspaceStore, island: IslandConfiguration) {
+        self.store = store
+        self.island = island
+        _draft = State(initialValue: island.name)
+        _savedName = State(initialValue: island.name)
+    }
+
+    var body: some View {
+        IslandTextField(title: "Name", text: $draft, prompt: "Main Island", onCommit: commit)
+            .onChange(of: island.name) { _, newName in
+                // External updates may arrive while the user is typing. Only
+                // refresh an untouched field; an active draft belongs to them.
+                if draft == savedName { draft = newName }
+                savedName = newName
+            }
+            .onDisappear(perform: commit)
+    }
+
+    private func commit() {
+        guard draft != savedName,
+              let current = store.island(id: island.id)
+        else { return }
+        let name = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else {
+            draft = current.name
+            savedName = current.name
+            return
+        }
+        if name != current.name {
+            store.updateIsland(island.id) { $0.name = name }
+        }
+        draft = store.island(id: island.id)?.name ?? current.name
+        savedName = draft
     }
 }

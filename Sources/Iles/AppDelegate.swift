@@ -16,6 +16,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        (SettingsAppearance(rawValue: UserDefaults.standard.string(forKey: "settingsAppearance") ?? "system") ?? .system).apply()
         ProcessInfo.processInfo.disableSuddenTermination()
 
         if Self.activateExistingInstanceIfNeeded() {
@@ -43,7 +44,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
     public func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         controller?.show()
-        return false
+        if !flag { showSettings() }
+        return true
     }
 
     public func applicationWillTerminate(_ notification: Notification) {
@@ -58,6 +60,16 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
     public func refresh() {
         runtime?.refreshNow()
+    }
+
+    public func showOverview() {
+        runtime?.settingsSection = .overview
+        settingsController?.show()
+    }
+
+    public func showGeneralSettings() {
+        runtime?.settingsSection = .general
+        settingsController?.show()
     }
 
     public func showSettings() {

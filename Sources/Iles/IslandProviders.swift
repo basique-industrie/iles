@@ -14,7 +14,7 @@ enum IslandProviders {
 
     @MainActor
     private static func liveProviders(settings: JSONSettingsRepository) -> [any AIProvider] {
-        [
+        let all: [any AIProvider] = [
             ClaudeProvider(
                 cliProbe: ClaudeUsageProbe(),
                 apiProbe: ClaudeAPIUsageProbe(),
@@ -59,7 +59,7 @@ enum IslandProviders {
                 settingsRepository: settings
             ),
             AlibabaProvider(
-                probe: AlibabaUsageProbe(settingsRepository: settings, cookieProvider: AlibabaBrowserCookieProvider()),
+                probe: AlibabaUsageProbe(settingsRepository: settings),
                 settingsRepository: settings
             ),
             MistralProvider(
@@ -78,7 +78,25 @@ enum IslandProviders {
                 probe: GrokUsageProbe(),
                 settingsRepository: settings
             ),
+            HarnaisProvider(
+                probe: HarnaisUsageProbe()
+            ),
         ]
+        return Self.applyingHarnaisOverlap(all, settings: settings)
+    }
+
+    static func applyingHarnaisOverlap(
+        _ providers: [any AIProvider],
+        settings: JSONSettingsRepository,
+        harnaisPresent: Bool? = nil
+    ) -> [any AIProvider] {
+        guard settings.hideBuiltInAIWhenHarnais() else { return providers }
+        let present = harnaisPresent ?? (
+            FileManager.default.fileExists(atPath: HarnaisUsageProbe.defaultFeedURL.path)
+                || FileManager.default.fileExists(atPath: HarnaisUsageProbe.defaultAccountsURL.path)
+        )
+        guard present else { return providers }
+        return providers.filter { !ProviderIdentity.harnaisUpstreamIDs.contains($0.id) }
     }
 
     @MainActor
@@ -108,6 +126,7 @@ enum IslandProviders {
             OpenCodeProvider(probe: DemoUsageProbe.generic(id: ProviderIdentity.openCode.rawValue, remaining: 58), settingsRepository: settings),
             OmpProvider(probe: DemoUsageProbe.generic(id: ProviderIdentity.omp.rawValue, remaining: 66), settingsRepository: settings),
             GrokProvider(probe: DemoUsageProbe.generic(id: ProviderIdentity.grok.rawValue, remaining: 29), settingsRepository: settings),
+            HarnaisProvider(probe: DemoUsageProbe.harnais),
         ]
     }
 }

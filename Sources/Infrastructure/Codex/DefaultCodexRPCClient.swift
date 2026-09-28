@@ -217,14 +217,15 @@ public final class DefaultCodexRPCClient: CodexRPCClient, @unchecked Sendable {
 
         AppLog.probes.debug("parseWindow dict keys: \(dict.keys.joined(separator: ", "))")
 
-        guard let usedPercent = dict["usedPercent"] as? Double else {
+        guard let usedPercent = jsonDouble(dict["usedPercent"]) ?? jsonDouble(dict["used_percent"]) else {
             AppLog.probes.debug("parseWindow: no usedPercent in dict")
             return nil
         }
 
         var resetDescription: String?
-        if let resetsAt = dict["resetsAt"] as? Int {
-            let date = Date(timeIntervalSince1970: TimeInterval(resetsAt))
+        if let resetsAt = jsonDouble(dict["resetsAt"]) ?? jsonDouble(dict["resets_at"]),
+           (Date.distantPast.timeIntervalSince1970...Date.distantFuture.timeIntervalSince1970).contains(resetsAt) {
+            let date = Date(timeIntervalSince1970: resetsAt)
             resetDescription = formatResetTime(date)
         }
 
@@ -252,6 +253,25 @@ public final class DefaultCodexRPCClient: CodexRPCClient, @unchecked Sendable {
         transport?.close()
     }
 
+    private func jsonDouble(_ value: Any?) -> Double? {
+        let number: Double?
+        if let value = value as? NSNumber {
+            number = value.doubleValue
+        } else if let value = value as? String {
+            number = Double(value.trimmingCharacters(in: .whitespacesAndNewlines))
+        } else {
+            number = nil
+        }
+        guard let number, number.isFinite else { return nil }
+        return number
+    }
+
+    private func jsonRPCID(_ value: Any?) -> Int? {
+        if let value = value as? Int { return value }
+        if let value = value as? NSNumber { return value.intValue }
+        return nil
+    }
+
     // MARK: - JSON-RPC
 
     private func request(transport: RPCTransport, method: String, params: [String: Any]? = nil) async throws -> [String: Any] {
@@ -268,7 +288,7 @@ public final class DefaultCodexRPCClient: CodexRPCClient, @unchecked Sendable {
                 continue
             }
 
-            guard let messageID = message["id"] as? Int, messageID == id else {
+            guard jsonRPCID(message["id"]) == id else {
                 continue
             }
 

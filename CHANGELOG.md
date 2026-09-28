@@ -7,6 +7,43 @@ string with no leading `v`. Tags add the `v`.
 
 ## Unreleased
 
+### Added
+
+- Native Harnais integration for configured Claude, Codex and Cursor accounts.
+  Iles refreshes usage through the local account helper on its own schedule.
+- Overview with island readings and direct editing, persistent sidebar
+  navigation, and System, Light and Dark appearances.
+- Account-following Harnais starter collection and independent used/remaining
+  modes for each metric slot.
+
+### Changed
+
+- Compact islands keep their 48-point width. Paired usage values use two lines;
+  storage readings separate the amount and unit.
+- Widget creation uses a compact preview, full-width metric and color controls,
+  account-grouped menus, and readable gallery cards. Search matches each recipe's
+  metrics rather than every metric supplied by its source.
+- Hover details show selected readings first, additional account usage, refresh
+  time and an Edit widget action. Finite transitions respect Reduce Motion.
+- AI catalogs show sources used in saved islands and configured Harnais accounts.
+  General can hide standalone providers duplicated by Harnais.
+- Removed the unavailable automatic Alibaba cookie importer and the battery
+  source from new catalogs. Saved battery widgets retain their source and recipes.
+
+### Fixed
+
+- Missing account data no longer causes widgets to switch to another account.
+  Missing slots retain their positions in paired readings.
+- Manually removing a Harnais widget stops automatic additions for that island.
+  Undo restores both the widget and its account-following preference.
+- Harnais stays in the catalog after its last widget is removed. Adding a widget
+  from Sources creates a destination island when needed.
+- Island names save on commit; placement sliders no longer draw hundreds of
+  ticks below the track. Fable labels use an uppercase F.
+- Codex numeric parsing rejects nonfinite readings and out-of-range reset dates.
+- Failed refreshes retain the last successful sample and timestamp. Malformed
+  visibility preferences fail the refresh rather than enabling hidden widgets.
+
 ## 0.1.0 - 2026-09-03
 
 ### Added

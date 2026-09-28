@@ -49,7 +49,7 @@ struct ComplicationGallery: View {
     private let primaryFilters: [CatalogFilter] = [.featured, .all, .inUse]
 
     private var sources: [ComplicationSourceDescriptor] {
-        runtime.sourceRegistry.descriptors.filter {
+        runtime.catalogSources.filter {
             (sourceScopeID == nil || $0.id == sourceScopeID)
                 && !visiblePresets(for: $0).isEmpty
         }.sorted { lhs, rhs in
@@ -65,7 +65,10 @@ struct ComplicationGallery: View {
 
     private var collections: [GalleryCollection] {
         var result: [GalleryCollection] = []
-        if let aiSource = preferredAISource {
+        if let harnaisCollection {
+            result.append(harnaisCollection)
+        }
+        if let aiSource = preferredAISource, aiSource.id != HarnaisWeeklyStarter.sourceID {
             let preferredRecipeIDs = [
                 "\(aiSource.id).session-weekly",
                 "\(aiSource.id).quota-pair",
@@ -78,22 +81,23 @@ struct ComplicationGallery: View {
                     ? .init(sourceID: aiSource.id, recipeID: recipeID)
                     : nil
             }
-            result.append(GalleryCollection(
-                id: "ai-command-center",
-                name: "AI Command Center",
-                summary: "A stack built from this provider’s available quota signals.",
-                symbol: "sparkles",
-                items: items
-            ))
+            if !items.isEmpty {
+                result.append(GalleryCollection(
+                    id: "ai-command-center",
+                    name: "AI Command Center",
+                    summary: "A stack built from this provider’s available quota signals.",
+                    symbol: "sparkles",
+                    items: items
+                ))
+            }
         }
         result.append(contentsOf: [
             GalleryCollection(
                 id: "mac-health",
                 name: "Mac Health",
-                summary: "Battery, resources, network, and thermal state.",
+                summary: "Resources, network, and thermal state.",
                 symbol: "macbook",
                 items: [
-                    .init(sourceID: "system.battery", recipeID: "system.battery.charge-ring"),
                     .init(sourceID: "system.mac", recipeID: "system.mac.resources"),
                     .init(sourceID: "system.mac", recipeID: "system.mac.network"),
                     .init(sourceID: "system.mac", recipeID: "system.mac.thermal"),
@@ -151,17 +155,35 @@ struct ComplicationGallery: View {
         return result
     }
 
+    private var harnaisCollection: GalleryCollection? {
+        guard runtime.catalogSources.contains(where: { $0.id == HarnaisWeeklyStarter.sourceID }),
+              let snapshot = runtime.provider(id: HarnaisWeeklyStarter.sourceID)?.snapshot,
+              let descriptor = runtime.descriptor(sourceID: HarnaisWeeklyStarter.sourceID)
+        else { return nil }
+        let items = HarnaisWeeklyStarter.glanceRecipes(in: snapshot, descriptor: descriptor).map {
+            GalleryCollection.Item(sourceID: HarnaisWeeklyStarter.sourceID, recipeID: $0.id)
+        }
+        guard !items.isEmpty else { return nil }
+        return GalleryCollection(
+            id: HarnaisWeeklyStarter.collectionID,
+            name: "Harnais Weekly",
+            summary: "One primary quota ring per Harnais account. New accounts are added automatically.",
+            symbol: "point.3.connected.trianglepath.dotted",
+            items: items
+        )
+    }
+
     private var preferredAISource: ComplicationSourceDescriptor? {
         if let selected = runtime.workspaceStore.selectedComplication,
            let descriptor = runtime.descriptor(sourceID: selected.sourceID),
            descriptor.kind == .usage {
             return descriptor
         }
-        return runtime.sourceRegistry.descriptors.first { $0.kind == .usage && !$0.complications.isEmpty }
+        return runtime.catalogSources.first { $0.kind == .usage && !$0.complications.isEmpty }
     }
 
     private func preferredSourceID(for kind: ConfigurableSourceKind) -> String {
-        let candidates = runtime.sourceRegistry.descriptors.filter { $0.sourceKindID == kind.sourceKindID }
+        let candidates = runtime.catalogSources.filter { $0.sourceKindID == kind.sourceKindID }
         if let selected = runtime.workspaceStore.selectedComplication?.sourceID,
            candidates.contains(where: { $0.id == selected }) {
             return selected
@@ -177,13 +199,13 @@ struct ComplicationGallery: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Add Complication")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(.white)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Add a widget")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(IslandChrome.text)
                     SettingsCaption(text: sourceScopeID.flatMap { runtime.descriptor(sourceID: $0)?.name }
-                        .map { "Choose a \($0) glance for \(selectedIslandName)." }
-                        ?? "Choose a glance for \(selectedIslandName). Sources and recipes can be added more than once.")
+                        .map { "Add a \($0) widget to \(selectedIslandName)." }
+                        ?? "Choose a widget for \(selectedIslandName), then adjust its data and appearance.")
                 }
                 Spacer()
                 newSourceMenu(label: "Add Source")
@@ -194,21 +216,23 @@ struct ComplicationGallery: View {
                     helpText: "Close without adding a complication"
                 ) { isPresented = false }
             }
-            .padding(16)
+            .padding(24)
 
-            HStack(spacing: 8) {
+            VStack(spacing: 12) {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(IslandChrome.tertiaryText)
                     TextField("Search by source, outcome, or metric", text: $search)
                         .textFieldStyle(.plain)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(IslandChrome.text)
                     if !search.isEmpty {
                         Button {
                             search = ""
                         } label: {
                             Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 11, weight: .semibold))
+                                .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(IslandChrome.tertiaryText)
                         }
                         .buttonStyle(.plain)
@@ -216,7 +240,7 @@ struct ComplicationGallery: View {
                     }
                 }
                 .padding(.horizontal, 10)
-                .frame(height: 40)
+                .frame(height: 36)
                 .background(
                     IslandChrome.fieldFill,
                     in: RoundedRectangle(cornerRadius: IslandChrome.fieldRadius, style: .continuous)
@@ -226,12 +250,14 @@ struct ComplicationGallery: View {
                         .strokeBorder(IslandChrome.controlBorder, lineWidth: 1)
                 }
 
+                HStack(spacing: 10) {
                 IslandSegmentBar(
                     items: primaryFilters,
                     selection: $filter,
                     title: { $0.title }
                 )
                 .frame(width: 250)
+                Spacer()
 
                 Menu {
                     Button {
@@ -266,20 +292,22 @@ struct ComplicationGallery: View {
                         }
                     }
                 } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(primaryFilters.contains(filter) ? IslandChrome.secondaryText : Color.white)
-                        .frame(width: 36, height: 36)
+                    SettingsMenuLabel(
+                        symbol: "line.3.horizontal.decrease",
+                        title: primaryFilters.contains(filter) ? "More filters" : filter.title
+                    )
                 }
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
-                .help("More filters")
+                .frame(width: 144)
+                .help("Filter widgets by availability")
+                }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 24)
             .padding(.bottom, 12)
 
             ScrollView {
-                LazyVStack(spacing: 12) {
+                LazyVStack(spacing: 24) {
                     if sourceScopeID == nil, search.isEmpty, category == nil, filter == .featured {
                         collectionSection
                     }
@@ -288,7 +316,7 @@ struct ComplicationGallery: View {
                     }
                     if sources.isEmpty {
                         ContentUnavailableView(
-                            "No Complications Found",
+                            "No widgets found",
                             systemImage: "magnifyingglass",
                             description: Text("Try another source, metric, or style name.")
                         )
@@ -296,12 +324,11 @@ struct ComplicationGallery: View {
                         .frame(maxWidth: .infinity, minHeight: 220)
                     }
                 }
-                .padding(16)
+                .padding(24)
             }
         }
         .frame(width: 900, height: 620)
-        .background(IslandPalette.popover)
-        .preferredColorScheme(.dark)
+        .background(IslandChrome.background)
         .onChange(of: search) { _, value in
             if !value.isEmpty, filter == .featured {
                 filter = .all
@@ -310,18 +337,9 @@ struct ComplicationGallery: View {
     }
 
     private var collectionSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                SectionLabel(title: "Starter Collections")
-                Spacer()
-                SettingsCaption(text: "Add a complete island stack")
-            }
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(collections) { collection in
-                        collectionCard(collection)
-                    }
-                }
+        SettingsDisclosure(title: "Starter collections", subtitle: "Add a set of widgets together") {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 240), spacing: 12)], spacing: 12) {
+                ForEach(collections) { collection in collectionCard(collection) }
             }
         }
     }
@@ -339,6 +357,7 @@ struct ComplicationGallery: View {
             && unavailableSource == nil
             && resolved.count == supportedItemCount
         let unavailableSourceName = unavailableSource.flatMap { runtime.descriptor(sourceID: $0)?.name }
+        let brands = collectionProviderBrands(collection)
         return Button {
             guard ready else {
                 if let unavailableSource {
@@ -360,32 +379,31 @@ struct ComplicationGallery: View {
                     tapAction: recipe.tapAction
                 )
             }
+            if collection.id == HarnaisWeeklyStarter.collectionID {
+                runtime.workspaceStore.updateIsland(islandID) { $0.followsHarnaisAccounts = true }
+            }
             for sourceID in Set(resolved.map { $0.0.id }) {
                 _ = runtime.refreshSource(sourceID)
             }
             isPresented = false
         } label: {
-            VStack(alignment: .leading, spacing: 7) {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Image(systemName: collection.symbol)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: 28, height: 28)
-                        .background(IslandChrome.selectedFill, in: Circle())
+                    collectionMark(symbol: collection.symbol, brands: brands)
                     Spacer()
-                    StatusChip(text: ready ? "\(resolved.count)" : "Setup")
+                    StatusChip(text: ready ? "\(resolved.count) widgets" : "Setup")
                 }
                 Text(collection.name)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(IslandChrome.text)
                     .lineLimit(1)
                 Text(unavailableSourceName.map { "Connect \($0) to add this stack." } ?? collection.summary)
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(IslandChrome.secondaryText)
                     .lineLimit(2)
             }
             .padding(10)
-            .frame(width: 190, height: 110, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 110, alignment: .topLeading)
             .background(IslandChrome.fieldFill, in: RoundedRectangle(cornerRadius: IslandChrome.rowRadius, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: IslandChrome.rowRadius, style: .continuous)
@@ -394,6 +412,52 @@ struct ComplicationGallery: View {
         }
         .buttonStyle(.plain)
         .help(ready ? "Add \(collection.name)" : "Complete source setup for this collection")
+    }
+
+    @ViewBuilder
+    private func collectionMark(symbol: String, brands: [ProviderBrand]) -> some View {
+        if brands.count > 1 {
+            HStack(spacing: -8) {
+                ForEach(Array(brands.enumerated()), id: \.element.id) { index, brand in
+                    ProviderMark(brand: brand, size: 14, zoomsOnHover: true, tint: .labelColor)
+                        .frame(width: 26, height: 26)
+                        .background(IslandChrome.track, in: Circle())
+                        .overlay {
+                            Circle().strokeBorder(IslandChrome.background, lineWidth: 1)
+                        }
+                        .zIndex(Double(index))
+                }
+            }
+            .accessibilityHidden(true)
+        } else if let brand = brands.first {
+            ProviderMark(brand: brand, size: 14, zoomsOnHover: true, tint: .labelColor)
+                .frame(width: 28, height: 28)
+                .background(IslandChrome.track, in: Circle())
+                .accessibilityHidden(true)
+        } else {
+            Image(systemName: symbol)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(IslandChrome.text)
+                .frame(width: 28, height: 28)
+                .background(IslandChrome.track, in: Circle())
+        }
+    }
+
+    private func collectionProviderBrands(_ collection: GalleryCollection) -> [ProviderBrand] {
+        guard collection.id == HarnaisWeeklyStarter.collectionID else { return [] }
+        var seen = Set<String>()
+        var brands: [ProviderBrand] = []
+        for item in collection.items {
+            let descriptor = runtime.descriptor(sourceID: item.sourceID)
+            let metricIDs = descriptor?.complications.first { $0.id == item.recipeID }?.metricIDs ?? []
+            guard let brand = HarnaisGlance.resolvedBrand(
+                sourceID: item.sourceID,
+                metricIDs: metricIDs,
+                descriptor: descriptor
+            ), seen.insert(brand.id).inserted else { continue }
+            brands.append(brand)
+        }
+        return brands
     }
 
     private func resolvedItems(
@@ -415,13 +479,15 @@ struct ComplicationGallery: View {
         let visible = visiblePresets(for: source)
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 9) {
-                SourceMark(sourceID: source.id, descriptor: source, size: 16)
+                SourceMark(sourceID: source.id, descriptor: source, size: 16, tint: .labelColor)
                     .frame(width: 28, height: 28)
-                VStack(alignment: .leading, spacing: 1) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(source.name)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white)
-                    SettingsCaption(text: source.gallerySourceSubtitle)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(IslandChrome.text)
+                    if source.gallerySourceSubtitle != source.name {
+                        SettingsCaption(text: source.gallerySourceSubtitle)
+                    }
                 }
                 Spacer(minLength: 8)
                 let status = galleryStatus(for: source)
@@ -449,12 +515,9 @@ struct ComplicationGallery: View {
                 }
             }
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(visible) { preset in
-                        galleryCard(source: source, preset: preset)
-                            .frame(width: 246)
-                    }
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 320), spacing: 12)], spacing: 12) {
+                ForEach(visible) { preset in
+                    galleryCard(source: source, preset: preset)
                 }
             }
             SettingsHairline()
@@ -466,37 +529,11 @@ struct ComplicationGallery: View {
         source: ComplicationSourceDescriptor,
         preset: ComplicationDescriptor
     ) -> some View {
-        let preview = ComplicationConfiguration(
-            recipeID: preset.id,
-            sourceID: source.id,
-            metricIDs: preset.metricIDs,
-            family: preset.family,
-            labelStyle: preset.labelStyle,
-            tint: preset.tint,
-            tapAction: preset.tapAction
-        )
-        let livePreviewValues = runtime.values(for: preview)
-        let fixtureValues = ComplicationPreviewFixture.values(for: preset, sourceID: source.id)
-        let usesFixture = livePreviewValues.isEmpty && !fixtureValues.isEmpty
-        let previewValues = usesFixture ? fixtureValues : livePreviewValues
-        let sourceError = runtime.snapshot(sourceID: source.id)?.errorDescription
-        let glance = previewValues.first?.displayText ?? (sourceError == nil ? "No data" : "Needs setup")
-        let availability = runtime.snapshot(sourceID: source.id)?.availability ?? .available
-        let needsSetup = availability.state == .setupRequired
-            || availability.state == .permissionRequired
-            || availability.recoveryAction == .configure
-            || availability.recoveryAction == .requestPermission
-            || availability.recoveryAction == .openSettings
-        let unavailable = availability.state == .unsupported
-            || (availability.state == .failed && !needsSetup)
-            || (sourceError != nil && source.kind == .system && !needsSetup)
-        return Button {
-            guard !unavailable else { return }
-            if needsSetup {
-                isPresented = false
-                configureSource(source.id)
-                return
-            }
+        ComplicationRecipeCard(runtime: runtime, source: source, preset: preset, configureSource: {
+            isPresented = false
+            configureSource(source.id)
+        }) {
+            if runtime.workspaceStore.selectedIsland == nil { runtime.workspaceStore.addIsland() }
             guard let islandID = runtime.workspaceStore.selectedIslandID else { return }
             _ = runtime.workspaceStore.addComplication(
                 to: islandID,
@@ -510,81 +547,7 @@ struct ComplicationGallery: View {
             )
             _ = runtime.refreshSource(source.id)
             isPresented = false
-        } label: {
-            HStack(spacing: 9) {
-                ComplicationSlotView(
-                    complication: preview,
-                    descriptor: source,
-                    values: previewValues,
-                    sourceError: usesFixture ? nil : sourceError,
-                    quality: usesFixture ? .cached : runtime.quality(for: preview),
-                    trendDirection: usesFixture ? .unknown : runtime.trendDirection(for: preview),
-                    renderScale: 0.9
-                )
-                .frame(width: 42, height: 46)
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 5) {
-                        Text(preset.name)
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .lineLimit(1)
-                        if preset.isNew {
-                            Text("NEW")
-                                .font(.system(size: 8, weight: .bold))
-                                .foregroundStyle(.white.opacity(0.82))
-                        }
-                    }
-                    Text(galleryCardSubtitle(source: source, preset: preset, glance: glance))
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(IslandChrome.secondaryText)
-                        .lineLimit(1)
-                }
-                Spacer(minLength: 5)
-                Image(systemName: unavailable ? "xmark" : (needsSetup ? "slider.horizontal.3" : "plus"))
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 24, height: 24)
-                    .background(IslandChrome.selectedFill, in: Circle())
-            }
-            .padding(9)
-            .frame(minHeight: 66)
-            .background(IslandChrome.fieldFill, in: RoundedRectangle(cornerRadius: IslandChrome.rowRadius, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: IslandChrome.rowRadius, style: .continuous)
-                    .strokeBorder(IslandChrome.controlBorder, lineWidth: 1)
-            }
         }
-        .buttonStyle(.plain)
-        .disabled(unavailable)
-        .opacity(unavailable ? 0.55 : 1)
-        .accessibilityLabel(unavailable
-            ? "\(source.name), \(preset.name), unavailable"
-            : (needsSetup
-                ? "Configure \(source.name) to use \(preset.name)"
-                : "Add \(source.name), \(preset.name), \(glance)"))
-        .help(unavailable
-            ? "This complication is currently unavailable"
-            : (needsSetup ? "Configure \(source.name)" : "Add \(preset.name) from \(source.name)"))
-    }
-
-    private func galleryCardSubtitle(
-        source: ComplicationSourceDescriptor,
-        preset: ComplicationDescriptor,
-        glance: String
-    ) -> String {
-        let metricNames = preset.metricIDs.compactMap { source.metricName(for: $0) }
-        let detail: String
-        switch metricNames.count {
-        case 0:
-            detail = glance
-        case 1:
-            detail = metricNames[0]
-        default:
-            detail = "\(metricNames.count) values"
-        }
-        return "\(preset.family.displayName) · \(detail)"
     }
 
     private func newSourceMenu(label: String) -> some View {
@@ -667,14 +630,15 @@ struct ComplicationGallery: View {
 
     private func visiblePresets(for source: ComplicationSourceDescriptor) -> [ComplicationDescriptor] {
         let sourceMatches = search.isEmpty
-            || ([source.name, source.settingsDomainName] + source.metrics.map(\.name))
+            || [source.name, source.settingsDomainName]
                 .joined(separator: " ")
                 .localizedCaseInsensitiveContains(search)
         return presets(for: source).filter { preset in
             guard category == nil || preset.category == category else { return false }
             guard matchesFilter(preset, source: source) else { return false }
             if search.isEmpty || sourceMatches { return true }
-            return ([preset.name, preset.summary, preset.question, preset.family.displayName] + preset.tags)
+            return ([preset.name, preset.summary, preset.question, preset.family.displayName] + preset.tags
+                + preset.metricIDs.map { source.metricName(for: $0) })
                 .joined(separator: " ")
                 .localizedCaseInsensitiveContains(search)
         }

@@ -31,9 +31,22 @@ public enum ComplicationLabelStyle: String, Codable, CaseIterable, Sendable {
 /// How a bounded usage metric is presented in one complication slot.
 /// The source always publishes canonical consumed progress; each ring or value
 /// can independently show that progress as used or remaining.
-public enum ComplicationValueMode: String, Codable, CaseIterable, Sendable {
+public enum ComplicationValueMode: String, Codable, CaseIterable, Sendable, Hashable {
     case used
     case remaining
+
+    /// Used only on newly added quota rings. Decode still falls back to used.
+    public static func remainingDefaults(
+        sourceID: String,
+        metricIDs: [String],
+        family: ComplicationFamily
+    ) -> [ComplicationValueMode] {
+        let isQuota = sourceID == ProviderIdentity.harnais.rawValue
+            || metricIDs.contains { $0.hasPrefix("quota") }
+        guard isQuota else { return [] }
+        let count = min(max(metricIDs.count, 1), family.metricLimit)
+        return Array(repeating: .remaining, count: count)
+    }
 }
 
 public enum ComplicationTintStyle: String, Codable, CaseIterable, Sendable {
@@ -249,6 +262,8 @@ public struct IslandConfiguration: Codable, Equatable, Identifiable, Sendable {
     public let id: UUID
     public var name: String
     public var isVisible: Bool
+    /// Only explicit account-following collections add rings after refresh.
+    public var followsHarnaisAccounts: Bool?
     public var placement: IslandPlacementConfiguration
     public var complications: [ComplicationConfiguration]
 
@@ -256,12 +271,14 @@ public struct IslandConfiguration: Codable, Equatable, Identifiable, Sendable {
         id: UUID = UUID(),
         name: String,
         isVisible: Bool = true,
+        followsHarnaisAccounts: Bool = false,
         placement: IslandPlacementConfiguration = .init(),
         complications: [ComplicationConfiguration] = []
     ) {
         self.id = id
         self.name = name
         self.isVisible = isVisible
+        self.followsHarnaisAccounts = followsHarnaisAccounts
         self.placement = placement
         self.complications = complications
     }

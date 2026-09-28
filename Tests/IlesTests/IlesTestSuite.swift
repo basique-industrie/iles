@@ -8,6 +8,8 @@ public enum IlesSelfTests {
         await runSettingsPersistenceTests(test)
         await runComplicationCatalogTests(test)
         await runRuntimeAndPresentationTests(test)
+        runIslandPresentationTests(test)
+        await runHarnaisRefreshTests(test)
         await runSecurityHardeningTests(test)
         return test.finish()
     }
