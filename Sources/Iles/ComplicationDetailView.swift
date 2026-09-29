@@ -18,13 +18,16 @@ struct ComplicationDetailView: View {
         guard let snapshot else { return 160 }
         let details = QuotaHoverDetails(snapshot: snapshot, selectedIDs: metricIDs, descriptor: descriptor)
         if details.metricIDs.contains(where: { snapshot.quotaResetDetails?[$0] != nil }) {
-            let rows = details.metricIDs.reduce(0) { height, id in
+            let rows: Int = details.metricIDs.reduce(0) { height, id in
                 height + (details.resetMetricIDs.contains(id) ? 38 : 24)
             }
-            let bankHeight = details.banks.reduce(0) { height, bank in
+            let bankHeight: Int = details.banks.reduce(0) { height, bank in
                 height + (bank.credits.availableCount > 0 ? 40 : 24) + (details.banks.count > 1 ? 14 : 0)
             }
-            return CGFloat(min(360, max(160, 124 + rows + max(0, details.metricIDs.count - 1) * 10 + bankHeight)))
+            let rowSpacing: Int = max(0, details.metricIDs.count - 1) * 10
+            let contentHeight: Int = 124 + rows + rowSpacing + bankHeight
+            let boundedHeight: Int = min(360, max(160, contentHeight))
+            return CGFloat(boundedHeight)
         }
         let groups = snapshot.focusedQuotaGroups(matching: metricIDs)
         // Generic details render the selected metrics, not the source's whole

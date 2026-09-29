@@ -7,6 +7,11 @@ string with no leading `v`. Tags add the `v`.
 
 ## Unreleased
 
+## 0.2.1 - 2026-09-29
+
+- Fix an Intel release compiler timeout in the hover-panel height calculation.
+- Include the Iles 0.2.0 interface and Harnais integration changes listed below.
+
 ## 0.2.0 - 2026-09-29
 
 ### Added
