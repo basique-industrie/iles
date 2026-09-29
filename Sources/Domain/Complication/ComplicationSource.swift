@@ -186,6 +186,7 @@ public struct SourceSnapshot: Codable, Equatable, Sendable {
     public let quality: ComplicationSampleQuality
     public let availability: ComplicationAvailability
     public let quotaGroups: [SourceQuotaGroup]?
+    public let quotaResetDetails: [String: QuotaResetDetails]?
 
     public init(
         sourceID: String,
@@ -194,7 +195,8 @@ public struct SourceSnapshot: Codable, Equatable, Sendable {
         errorDescription: String? = nil,
         quality: ComplicationSampleQuality = .live,
         availability: ComplicationAvailability = .available,
-        quotaGroups: [SourceQuotaGroup]? = nil
+        quotaGroups: [SourceQuotaGroup]? = nil,
+        quotaResetDetails: [String: QuotaResetDetails]? = nil
     ) {
         self.sourceID = sourceID
         self.capturedAt = capturedAt
@@ -203,6 +205,7 @@ public struct SourceSnapshot: Codable, Equatable, Sendable {
         self.quality = quality
         self.availability = availability
         self.quotaGroups = quotaGroups
+        self.quotaResetDetails = quotaResetDetails
     }
 
     /// Groups that contain any of `metricIDs`. Empty `metricIDs` returns every group.

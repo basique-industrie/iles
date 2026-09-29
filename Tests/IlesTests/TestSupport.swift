@@ -167,6 +167,7 @@ final class CountingProvider: AIProvider {
     var lastError: Error?
     var refreshCalls: [RefreshKind] = []
     var delay: Duration = .zero
+    var onRefreshStart: (() -> Void)?
     var percentRemaining: Double = 40
     var emptyQuotas = false
 
@@ -183,6 +184,7 @@ final class CountingProvider: AIProvider {
     }
 
     func refresh(_ kind: RefreshKind) async throws -> UsageSnapshot {
+        onRefreshStart?()
         if delay > .zero {
             try await Task.sleep(for: delay)
         }

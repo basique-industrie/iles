@@ -70,7 +70,7 @@ enum FirstPartyComplicationCatalog {
             )
         }
         let values = Dictionary(uniqueKeysWithValues: metricIDs.map { metricID in
-            (metricID, fixtureValue(metricID: metricID, family: family))
+            (metricID, fixtureValue(metricID: metricID, sourceID: sourceID))
         })
         return ComplicationRecipe(
             id: id,
@@ -92,7 +92,26 @@ enum FirstPartyComplicationCatalog {
         )
     }
 
-    static func fixtureValue(metricID: String, family: ComplicationFamily) -> ComplicationValue {
+    static func fixtureValue(metricID: String, sourceID: String) -> ComplicationValue {
+        switch metricID {
+        case "branch": return .value("main", unit: nil)
+        case "nextTitle":
+            return .value(sourceID == "calendar.reminders" ? "Review notes" : "Team meeting", unit: nil)
+        case "currentState": return .status(label: "In a meeting", level: .healthy)
+        case "sync": return .status(label: "Up to date", level: .healthy)
+        case "ci": return .status(label: "Passing", level: .healthy)
+        case "deployment": return .status(label: "Deployed", level: .healthy)
+        case "network": return .status(label: "Online", level: .healthy)
+        case "thermal": return .status(label: "Nominal", level: .healthy)
+        case "latencyValue": return .value("180", unit: "ms")
+        case "responseCode": return .value("200", unit: nil)
+        case "availability": return .gauge(value: 100, range: 0...100, label: "100%")
+        case "storageFree": return .value("128", unit: "GB")
+        case "changes", "eventsToday", "dueToday", "openPRs": return .value("3", unit: nil)
+        case "reviews", "staged", "unstaged", "untracked": return .value("1", unit: nil)
+        case "ahead", "behind", "overdue", "failingJobs", "failures": return .value("0", unit: nil)
+        default: break
+        }
         if metricID == "lastCheck" {
             return .date(Date().addingTimeInterval(-7_200), label: "2h")
         }

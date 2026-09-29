@@ -8,9 +8,21 @@ are 48 points wide, with 24-point rings and two lines for paired usage readings.
 
 Overview provides readings and direct editing. Islands contains placement,
 ordering and widget configuration. Sources owns setup and refresh controls.
-General contains appearance, startup and refresh settings. The widget inspector
+Settings contains appearance, startup and refresh settings. The widget inspector
 separates Appearance, Data and Behavior, with a compact preview and an explicit
 notice that changes apply immediately.
+
+The settings window now matches Harnais's 52-point titlebar, native traffic-light
+placement and 260-point sidebar. Navigation uses 32-point rows, 15-point icons,
+13-point labels and the same subtle selection fill. The island list stays visible
+across pages. Shared controls use Harnais's hover colors, 20-point page titles,
+and 16/24/32-point top/horizontal/bottom page padding. Floating islands keep their
+existing geometry and colors. Overview, Settings, About and source details fill
+the available content width with consistent page insets. Settings actions use one
+row on wider windows and wrap into two rows when space is limited.
+The alignment pass was checked live in Overview, the island editor and dark
+Settings. System appearance was restored after inspection. All 694 checks and
+the public-release checks passed before packaging.
 
 The gallery shows readable account titles, window names and values beside compact
 thumbnails. Data selectors group metrics by account. Each slot has separate
@@ -85,6 +97,9 @@ evidence of a performance improvement or a long-duration memory benchmark.
 
 ## Verification
 
+The subsequent [view-by-view UI review](ui-review-2026-09-28.md) records the source,
+gallery, inspector and resize checks from the latest design-system pass.
+
 Automated tests cover refresh coalescing, independent freshness, failed and
 malformed responses, visibility preservation, slot ordering, account identity,
 removal/undo, legacy source compatibility, geometry, persistence, quota
@@ -110,8 +125,9 @@ configuration and packaged separately from the shipped app.
 - Account renames need stable account and window IDs in the Harnais contract for
   automatic migration. Until then, a renamed widget may need its data selected
   again. The app preserves the old configuration.
-- Typed per-account failure, first-use and reset-credit metadata is not fully
-  represented in the native quota model. An absent metric is reported as missing.
+- Typed per-account failure and first-use metadata is not fully represented in
+  the native quota model. An absent metric is reported as missing. Reset-credit
+  counts and next-expiry dates now pass through to hover cards.
 - Multiple displays, display scaling changes, macOS Reduce Motion enabled and
   long-duration memory growth need dedicated live coverage. The corresponding
   code paths were reviewed, but those scenarios were not reproduced here.

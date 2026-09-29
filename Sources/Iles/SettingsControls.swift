@@ -15,6 +15,8 @@ struct SettingsToggleRow: View {
     let title: String
     @Binding var isOn: Bool
     var disabled = false
+    var horizontalPadding: CGFloat = 16
+    var verticalPadding: CGFloat = 12
 
     var body: some View {
         HStack(spacing: 12) {
@@ -26,8 +28,8 @@ struct SettingsToggleRow: View {
                 .disabled(disabled)
                 .accessibilityLabel(title)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.horizontal, horizontalPadding)
+        .padding(.vertical, verticalPadding)
         .opacity(disabled ? 0.55 : 1)
     }
 }
@@ -56,7 +58,7 @@ struct IslandSegmentBar<Item: Hashable>: View {
         }
         .fixedSize(horizontal: !equalWidth, vertical: false)
         .padding(2)
-        .background(IslandChrome.track, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(IslandChrome.rowSelected, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .strokeBorder(IslandChrome.hairline, lineWidth: 1)
@@ -136,7 +138,7 @@ struct QuietButton: View {
                         .font(.system(size: 12, weight: .semibold))
                 }
                 Text(title)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: compact ? 12 : 13, weight: .medium))
             }
             .foregroundStyle(foreground)
             .padding(.horizontal, hPad)
@@ -150,15 +152,15 @@ struct QuietButton: View {
                     .strokeBorder(border, lineWidth: 1)
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SettingsActionButtonStyle())
         .onHover { isHovering = $0 }
-        .opacity(isEnabled ? 1 : 0.4)
         .animation(.easeOut(duration: 0.12), value: isHovering)
     }
 
     private var isDestructive: Bool { role == .destructive }
 
     private var foreground: Color {
+        if !isEnabled { return IslandChrome.secondaryText }
         if isDestructive {
             if prominence == .primary { return .white }
             return IslandChrome.error
@@ -171,20 +173,32 @@ struct QuietButton: View {
     }
 
     private var background: Color {
+        if !isEnabled { return prominence == .tertiary ? .clear : IslandChrome.rowSelected }
         if isDestructive, prominence == .primary { return IslandChrome.error }
         switch prominence {
         case .primary: return isHovering ? IslandChrome.accent.opacity(0.9) : IslandChrome.accent
-        case .secondary: return isHovering ? IslandChrome.track : IslandChrome.surface
-        case .tertiary: return isHovering ? IslandChrome.track : Color.clear
+        case .secondary: return isHovering ? IslandChrome.rowSelected : IslandChrome.surface
+        case .tertiary: return isHovering ? IslandChrome.rowSelected : Color.clear
         }
     }
 
     private var border: Color {
+        if !isEnabled { return prominence == .tertiary ? .clear : IslandChrome.border }
         switch prominence {
         case .primary: return Color.clear
-        case .secondary: return IslandChrome.border
+        case .secondary: return IslandChrome.inputBorder
         case .tertiary: return isHovering ? IslandChrome.border : Color.clear
         }
+    }
+}
+
+/// Disabled colors are set by QuietButton; avoid PlainButtonStyle's extra fade.
+struct SettingsActionButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .opacity(isEnabled && configuration.isPressed ? 0.85 : 1)
     }
 }
 
@@ -224,7 +238,7 @@ struct QuietIconButton: View {
                 .foregroundStyle(isHovering ? IslandChrome.text : IslandChrome.secondaryText)
                 .frame(width: IslandChrome.headerControlSize, height: IslandChrome.headerControlSize)
                 .background(
-                    isHovering ? IslandChrome.track : Color.clear,
+                    isHovering ? IslandChrome.rowSelected : Color.clear,
                     in: RoundedRectangle(cornerRadius: 8, style: .continuous)
                 )
                 .overlay {
@@ -273,8 +287,8 @@ struct SettingsMenuLabel: View {
             Image(systemName: symbol)
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(IslandChrome.text)
-                .frame(width: compact ? 24 : 26, height: compact ? 24 : 26)
-                .background(IslandChrome.track, in: Circle())
+                .frame(width: 14)
+                .accessibilityHidden(true)
             Text(title)
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(IslandChrome.text)
@@ -288,15 +302,14 @@ struct SettingsMenuLabel: View {
                     .lineLimit(1)
             }
             Image(systemName: "chevron.down")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(isHovering ? IslandChrome.text : IslandChrome.secondaryText)
-                .frame(width: 22, height: 22)
-                .background(IslandChrome.track, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(IslandChrome.secondaryText)
+                .accessibilityHidden(true)
         }
         .padding(.horizontal, compact ? 8 : 10)
         .frame(maxWidth: .infinity, minHeight: controlHeight ?? IslandChrome.fieldHeight)
         .background(
-            isHovering ? IslandChrome.track : IslandChrome.fieldFill,
+            isHovering ? IslandChrome.rowSelected : IslandChrome.fieldFill,
             in: RoundedRectangle(cornerRadius: 8, style: .continuous)
         )
         .overlay {
@@ -307,6 +320,7 @@ struct SettingsMenuLabel: View {
                 )
         }
         .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .accessibilityElement(children: .combine)
         .onHover { isHovering = $0 }
         .animation(.easeOut(duration: 0.12), value: isHovering)
     }
@@ -319,7 +333,7 @@ private struct SettingsPopupChrome: ViewModifier {
         content
             .frame(minHeight: IslandChrome.fieldHeight)
             .background(
-                isHovering ? IslandChrome.track : IslandChrome.fieldFill,
+                isHovering ? IslandChrome.rowSelected : IslandChrome.fieldFill,
                 in: RoundedRectangle(cornerRadius: 8, style: .continuous)
             )
             .overlay {

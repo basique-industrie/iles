@@ -26,7 +26,7 @@ struct ComplicationSlotView: View {
         .frame(height: scaled(includesValueLabel ? IslandMetrics.itemHeight : IslandMetrics.ringSize))
         .frame(width: scaled(IslandMetrics.width - 12))
         .privacySensitive()
-        .opacity(quality == .stale ? 0.78 : (sourceError == nil || !values.isEmpty ? 1 : 0.62))
+        .opacity(isSyncing ? 1 : quality == .stale ? 0.78 : (sourceError == nil || !values.isEmpty ? 1 : 0.62))
         .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: isSelected)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(glanceName)
@@ -44,7 +44,7 @@ struct ComplicationSlotView: View {
 
     private var graphic: some View {
         ZStack {
-            familyGraphic
+            familyGraphic.opacity(isSyncing ? 0.25 : 1)
             sourceMark
             syncIndicator
             qualityIndicator
@@ -63,29 +63,31 @@ struct ComplicationSlotView: View {
                 size: scaled(IslandMetrics.markSize),
                 tint: NSColor(accent).blended(withFraction: 0.72, of: .white) ?? .white
             )
-            .opacity(isSyncing ? 0.4 : (isSelected ? 1 : 0.88))
+            .opacity(isSelected ? 1 : 0.88)
         }
     }
 
     @ViewBuilder
     private var syncIndicator: some View {
         if isSyncing {
-            ProgressView()
-                .controlSize(renderScale >= 1.5 ? .small : .mini)
-                .tint(.white)
+            RingLoadingIndicator(
+                color: semanticColor(index: 0),
+                lineWidth: scaled(IslandMetrics.accentStroke),
+                inset: scaled(IslandMetrics.ringStroke / 2)
+            )
         }
     }
 
     @ViewBuilder
     private var qualityIndicator: some View {
-        if quality == .unavailable || quality == .failed {
+        if !isSyncing && (quality == .unavailable || quality == .failed) {
             Image(systemName: "exclamationmark")
                 .font(.system(size: scaled(7), weight: .bold))
                 .foregroundStyle(quality == .failed ? Color.red : IslandPalette.label)
                 .frame(width: scaled(11), height: scaled(11))
                 .background(Color.black.opacity(0.82), in: Circle())
                 .offset(x: scaled(14), y: scaled(-14))
-        } else if quality == .stale {
+        } else if !isSyncing && quality == .stale {
             Image(systemName: "clock")
                 .font(.system(size: scaled(7), weight: .bold))
                 .foregroundStyle(IslandPalette.label)
@@ -305,7 +307,7 @@ struct ComplicationSlotView: View {
 
     private var label: String {
         guard complication.labelStyle != .hidden else { return "" }
-        guard !values.isEmpty else { return sourceError == nil ? "—" : "!" }
+        guard !values.isEmpty else { return isSyncing ? "…" : sourceError == nil ? "—" : "!" }
         if (complication.family == .dualRing
             || complication.family == .summary
             || complication.family == .cluster), values.count > 1 {
@@ -363,6 +365,7 @@ struct ComplicationSlotView: View {
     }
 
     private var accessibilityValue: String {
+        if isSyncing { return values.isEmpty ? "Loading" : "Updating. Last reading: " + values.map(\.displayText).joined(separator: ", ") }
         if let sourceError, values.isEmpty { return "Unavailable: \(sourceError)" }
         if values.isEmpty {
             return quality == .unavailable || quality == .failed ? "Not reported" : "No data"

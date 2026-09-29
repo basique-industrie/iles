@@ -50,7 +50,7 @@ struct HarnaisUsageStatusView: View {
                           Date().timeIntervalSince(snapshot.capturedAt) > runtime.harnaisStaleAfter {
                     SettingsNotice(text: "Usage has not refreshed recently. Retry here to fetch the latest account limits.", style: .warning)
                 }
-                SettingsCaption(text: "Manage accounts and ring visibility in Harnais. Iles refreshes usage independently using Background updates in General, even when Harnais is closed.")
+                SettingsCaption(text: "Manage accounts and ring visibility in Harnais. Iles refreshes usage independently using Background updates in Settings, even when Harnais is closed.")
             }
         }
     }

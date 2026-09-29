@@ -34,7 +34,7 @@ final class SettingsController {
             window.title = AppIdentity.current.displayName
             window.level = .normal
             window.isOpaque = true
-            window.backgroundColor = IslandChrome.backgroundNSColor
+            window.backgroundColor = IslandChrome.sidebarNSColor
             window.titlebarAppearsTransparent = true
             window.appearance = nil
             window.isReleasedWhenClosed = false

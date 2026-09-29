@@ -18,6 +18,9 @@ public struct UsageQuota: Sendable, Equatable, Hashable, Comparable {
     /// Raw reset text from CLI (e.g., "Resets 11am", "Resets Jan 15")
     public let resetText: String?
 
+    public let accountID: String?
+    public let resetCredits: ResetCredits?
+
     /// The actual duration of this quota's window in seconds, when the data
     /// source reports it (e.g. Oh My Pi's `window.durationMs`). Pace math
     /// falls back to `quotaType.duration` when nil.
@@ -74,13 +77,17 @@ public struct UsageQuota: Sendable, Equatable, Hashable, Comparable {
         group: String? = nil,
         compactTitle: String? = nil,
         menuBarTitle: String? = nil,
-        currency: String? = nil
+        currency: String? = nil,
+        accountID: String? = nil,
+        resetCredits: ResetCredits? = nil
     ) {
         self.percentRemaining = min(100, percentRemaining)  // Allow negative, cap at 100
         self.quotaType = quotaType
         self.providerId = providerId
         self.resetsAt = resetsAt
         self.resetText = resetText
+        self.accountID = accountID
+        self.resetCredits = resetCredits
         self.windowDuration = windowDuration
         self.dollarRemaining = dollarRemaining
         self.dollarUsed = dollarUsed

@@ -23,6 +23,11 @@ on:
     tags: ["v*"]
   workflow_dispatch:
     inputs:
+      product:
+        description: Product to sign (Harnais artifacts are downloaded for publication in its own repository)
+        type: choice
+        options: [iles, harnais]
+        default: iles
       tag:
         description: The existing tag to build (blank for the current ref)
         required: false
@@ -50,9 +55,20 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          repository: ${{ inputs.product == 'harnais' && 'basique-industrie/harnais' || github.repository }}
           ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
           fetch-tags: true
+
+      - name: Inject Harnais native OAuth registrations
+        if: ${{ inputs.product == 'harnais' }}
+        env:
+          HARNAIS_NATIVE_OAUTH_CATALOG: ${{ secrets.HARNAIS_NATIVE_OAUTH_CATALOG }}
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$HARNAIS_NATIVE_OAUTH_CATALOG"
+          printf '%s' "$HARNAIS_NATIVE_OAUTH_CATALOG" > Sources/Infrastructure/Resources/official-oauth-clients.json
 
       - name: Unlock a keychain for this run
         env:
@@ -116,17 +132,37 @@ jobs:
 
       - name: Build, sign, notarize and package
         env:
+          NOTARY_PROFILE: iles
+          RELEASE_PRODUCT: ${{ inputs.product }}
+          RELEASE_TAG: ${{ inputs.tag }}
           ILES_SKIP_TAG_CHECK: ${{ inputs.dry_run && inputs.tag == '' && '1' || '' }}
-        run: ./scripts/release.sh
+        run: |
+          if [[ "$RELEASE_PRODUCT" == "harnais" && -z "$RELEASE_TAG" ]]; then
+            echo "Harnais signing requires an explicit release tag." >&2
+            exit 1
+          fi
+          ./scripts/release.sh
+
+      - name: Preserve signed Harnais artifacts
+        if: ${{ inputs.product == 'harnais' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: Harnais-notarized
+          path: |
+            dist/Harnais-*.zip
+            dist/Harnais-*.zip.sha256
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Publish
-        if: ${{ !inputs.dry_run }}
+        if: ${{ !inputs.dry_run && inputs.product != 'harnais' }}
         env:
           GH_TOKEN: ${{ github.token }}
-        run: ./scripts/publish.sh "${{ inputs.tag || github.ref_name }}"
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: ./scripts/publish.sh "$RELEASE_TAG"
 
       - name: What a real run would have published
-        if: ${{ inputs.dry_run }}
+        if: ${{ inputs.dry_run && inputs.product != 'harnais' }}
         run: |
           set -euo pipefail
           version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Sources/Iles/Info.plist)"

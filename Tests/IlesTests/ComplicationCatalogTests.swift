@@ -32,6 +32,28 @@ extension IlesSelfTests {
 
         let demo = IsolatedBox.make()
         defer { demo.tearDown() }
+        do {
+            let provider = CountingProvider(id: "loading-test")
+            provider.delay = .milliseconds(100)
+            let registry = ComplicationSourceRegistry(
+                providers: [provider], sessionMonitor: SessionMonitor(), settingsStore: demo.store
+            )
+            var refresh: Task<[String: SourceSnapshot], Never>?
+            await withCheckedContinuation { continuation in
+                provider.onRefreshStart = { continuation.resume() }
+                refresh = Task { await registry.refresh(sourceIDs: [provider.id], kind: .interactive) }
+            }
+            test.expect(registry.refreshingSourceIDs.contains(provider.id), "source refresh is observable even when provider has no syncing flag")
+            _ = await refresh?.value
+            test.expect(registry.refreshingSourceIDs.isEmpty, "loading indication ends after refresh")
+            await withCheckedContinuation { continuation in
+                provider.onRefreshStart = { continuation.resume() }
+                refresh = Task { await registry.refresh(sourceIDs: [provider.id], kind: .interactive) }
+            }
+            registry.cancelRefreshes()
+            test.expect(registry.refreshingSourceIDs.isEmpty, "cancelled sources cannot leave a permanent spinner")
+            _ = await refresh?.value
+        }
         let demoProviders = IslandProviders.makeAll(demo: true, settings: demo.settings)
         test.expectEqual(demoProviders.count, ProviderBrand.launchCases.count, "demo builds every supported launch provider")
         test.expectEqual(

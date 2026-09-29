@@ -175,13 +175,14 @@ struct ComplicationInspector: View {
                 Text("Show the value below the widget.")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(IslandChrome.tertiaryText)
-                    .lineLimit(1)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 8)
             IslandToggle(isOn: labelVisibility)
                 .accessibilityLabel("Show Value Label")
         }
         .padding(.horizontal, 10)
+        .padding(.vertical, 8)
         .frame(maxWidth: .infinity, minHeight: 46)
         .background(
             IslandChrome.cardFill,
@@ -204,7 +205,7 @@ struct ComplicationInspector: View {
                         sourceError: usesFixture ? nil : snapshot?.errorDescription,
                         quality: usesFixture ? .cached : runtime.quality(for: complication),
                         trendDirection: usesFixture ? .unknown : runtime.trendDirection(for: complication),
-                        isSyncing: runtime.provider(id: complication.sourceID)?.isSyncing == true
+                        isSyncing: runtime.isRefreshingSource(complication.sourceID)
                     )
                     .frame(width: 56, height: 64)
                     .background(IslandPalette.surface, in: RoundedRectangle(cornerRadius: 12))
@@ -256,7 +257,7 @@ struct ComplicationInspector: View {
 
     private var previewStatus: String {
         if usesFixture { return "Sample data" }
-        if runtime.provider(id: complication.sourceID)?.isSyncing == true { return "Updating…" }
+        if runtime.isRefreshingSource(complication.sourceID) { return "Updating…" }
         switch runtime.quality(for: complication) {
         case .live: return "Live preview"
         case .cached: return "Saved reading"

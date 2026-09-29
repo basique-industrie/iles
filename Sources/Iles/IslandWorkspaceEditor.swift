@@ -70,7 +70,9 @@ struct IslandWorkspaceEditor: View {
                 emptyIslandsCanvas
             }
         }
-        .padding(IslandChrome.pageInset)
+        .padding(.horizontal, IslandChrome.pageInset)
+        .padding(.top, IslandChrome.pageTop)
+        .padding(.bottom, IslandChrome.pageBottom)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
@@ -570,9 +572,11 @@ struct IslandWorkspaceEditor: View {
         _ complication: ComplicationConfiguration,
         descriptor: ComplicationSourceDescriptor?
     ) -> String {
-        complication.metricIDs.map { id in
-            descriptor?.metricName(for: id) ?? ComplicationMetricDescriptor.fallbackName(for: id)
-        }.joined(separator: " + ")
+        HarnaisGlance.metricSummary(
+            sourceID: complication.sourceID,
+            metricIDs: complication.metricIDs,
+            descriptor: descriptor
+        )
     }
 
     @ViewBuilder
@@ -598,7 +602,9 @@ struct IslandWorkspaceEditor: View {
                         )
                     }
                 }
-                .padding(IslandChrome.pageInset)
+                .padding(.horizontal, IslandChrome.pageInset)
+                .padding(.top, IslandChrome.pageTop)
+                .padding(.bottom, IslandChrome.pageBottom)
             }
             .scrollIndicators(.hidden)
         }

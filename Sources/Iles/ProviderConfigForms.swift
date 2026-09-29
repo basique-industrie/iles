@@ -136,7 +136,12 @@ struct ClaudeHooksSection: View {
             title: "Claude Code Hooks",
             subtitle: "Track live sessions through Claude Code's local hook configuration."
         ) {
-            SettingsToggleRow(title: "Track live Claude Code sessions", isOn: $hooks)
+            SettingsToggleRow(
+                title: "Track live Claude Code sessions",
+                isOn: $hooks,
+                horizontalPadding: 0,
+                verticalPadding: 6
+            )
                 .onChange(of: hooks) { _, value in
                     settings.setHookEnabled(value)
                     NotificationCenter.default.post(name: .hookSettingsChanged, object: nil)

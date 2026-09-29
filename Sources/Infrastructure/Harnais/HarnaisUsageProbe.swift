@@ -109,7 +109,9 @@ public struct HarnaisUsageProbe: UsageProbe {
                         resetText: quota.resetText,
                         group: Self.privacySafeGroup(quota.group, fallback: group),
                         compactTitle: quota.compactTitle,
-                        menuBarTitle: quota.menuBarTitle
+                        menuBarTitle: quota.menuBarTitle,
+                        accountID: account.id,
+                        resetCredits: account.resetCredits
                     )
                 )
             }
@@ -183,6 +185,7 @@ public struct HarnaisUsageProbe: UsageProbe {
         var label: String
         var quotas: [Quota]
         var error: String?
+        var resetCredits: ResetCredits?
 
         var groupTitle: String {
             let name = ProviderIdentity(rawValue: provider)?.displayName ?? provider.capitalized

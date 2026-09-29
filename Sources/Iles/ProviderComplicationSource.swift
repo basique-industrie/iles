@@ -363,7 +363,13 @@ final class ProviderComplicationSource: ComplicationSource {
                     message: "Showing the last successful provider snapshot.",
                     recoveryAction: .retry
                 ),
-            quotaGroups: sourceGroups(from: snapshot)
+            quotaGroups: sourceGroups(from: snapshot),
+            quotaResetDetails: snapshot.quotas.reduce(into: [:]) { details, quota in
+                details[metricID(for: quota)] = QuotaResetDetails(
+                    resetsAt: quota.resetsAt, resetText: quota.resetText,
+                    accountID: quota.accountID, resetCredits: quota.resetCredits
+                )
+            }
         )
     }
 

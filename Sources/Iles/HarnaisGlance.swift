@@ -30,6 +30,25 @@ enum HarnaisGlance {
         return ProviderBrand(rawValue: sourceID)
     }
 
+    /// Compact list titles repeat an account only once when every value belongs to it.
+    static func metricSummary(
+        sourceID: String,
+        metricIDs: [String],
+        descriptor: ComplicationSourceDescriptor?
+    ) -> String {
+        let names = metricIDs.map {
+            descriptor?.metricName(for: $0) ?? ComplicationMetricDescriptor.fallbackName(for: $0)
+        }
+        guard let account = accountLabel(sourceID: sourceID, metricIDs: metricIDs, descriptor: descriptor),
+              let brand = resolvedBrand(sourceID: sourceID, metricIDs: metricIDs, descriptor: descriptor),
+              metricIDs.allSatisfy({ resolvedBrand(sourceID: sourceID, metricIDs: [$0], descriptor: descriptor) == brand })
+        else { return names.joined(separator: " + ") }
+        let windows = zip(metricIDs, names).map {
+            rowLabel(sourceID: sourceID, metricID: $0, metricName: $1)
+        }.joined(separator: " + ")
+        return "\(brand.title) · \(account) · \(windows)"
+    }
+
     static func rowLabel(sourceID: String, metricID: String, metricName: String) -> String {
         applies(to: sourceID) ? windowCaption(metricID: metricID, metricName: metricName) : metricName
     }

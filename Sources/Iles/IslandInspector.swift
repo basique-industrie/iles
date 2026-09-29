@@ -10,10 +10,13 @@ struct IslandInspector: View {
     @State private var topGapDraft: Double?
 
     var body: some View {
-        header
-        identity
-        SettingsHairline()
-        placement
+        VStack(alignment: .leading, spacing: 20) {
+            header
+            identity
+            SettingsHairline()
+            placement
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var header: some View {
@@ -40,46 +43,59 @@ struct IslandInspector: View {
     }
 
     private var identity: some View {
-        SettingsGroup(title: "Identity") {
+        VStack(alignment: .leading, spacing: 12) {
             IslandNameEditor(store: runtime.workspaceStore, island: island)
                 .id(island.id)
-            SettingsToggleRow(title: "Visible", isOn: visibility)
+            SettingsToggleRow(title: "Visible", isOn: visibility,
+                              horizontalPadding: 0, verticalPadding: 6)
             if island.complications.contains(where: { $0.sourceID == HarnaisWeeklyStarter.sourceID }) {
-                SettingsToggleRow(title: "Include new Harnais accounts", isOn: Binding(
-                    get: { island.followsHarnaisAccounts == true },
-                    set: { value in runtime.workspaceStore.updateIsland(island.id) { $0.followsHarnaisAccounts = value } }
-                ))
-                SettingsCaption(text: "Removing a Harnais widget turns off automatic additions for this island.")
+                VStack(alignment: .leading, spacing: 6) {
+                    SettingsToggleRow(title: "Include new Harnais accounts", isOn: Binding(
+                        get: { island.followsHarnaisAccounts == true },
+                        set: { value in runtime.workspaceStore.updateIsland(island.id) { $0.followsHarnaisAccounts = value } }
+                    ), horizontalPadding: 0, verticalPadding: 6)
+                    Text("Removing a Harnais widget turns off automatic additions for this island.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(IslandChrome.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
     }
 
     private var placement: some View {
-        SettingsGroup(title: "Placement") {
-            FieldLabel(title: "Display")
-            displayPicker
-            FieldLabel(title: "Screen edge")
-            IslandSegmentBar(items: IslandEdge.allCases, selection: edge, title: { $0 == .leading ? "Left" : "Right" })
-            FieldLabel(title: "Mode")
-            IslandSegmentBar(items: IslandPlacementMode.allCases, selection: mode, title: { $0 == .automatic ? "Automatic" : "Manual" })
+        VStack(alignment: .leading, spacing: 14) {
+            SectionLabel(title: "Placement")
+            VStack(alignment: .leading, spacing: 6) {
+                FieldLabel(title: "Display")
+                displayPicker
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                FieldLabel(title: "Screen edge")
+                IslandSegmentBar(items: IslandEdge.allCases, selection: edge, title: { $0 == .leading ? "Left" : "Right" })
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                FieldLabel(title: "Position")
+                IslandSegmentBar(items: IslandPlacementMode.allCases, selection: mode, title: { $0 == .automatic ? "Automatic" : "Manual" })
+            }
             if island.placement.mode == .manual {
-                HStack {
-                    Text("Top spacing")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(IslandChrome.secondaryText)
-                    Spacer()
-                    Text("\(Int(topGap.wrappedValue)) pt")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(IslandChrome.text)
-                        .monospacedDigit()
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        FieldLabel(title: "Top spacing")
+                        Spacer()
+                        Text("\(Int(topGap.wrappedValue)) pt")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(IslandChrome.text)
+                            .monospacedDigit()
+                    }
+                    SettingsSlider(
+                        value: topGap,
+                        range: topGapRange,
+                        onEditingChanged: topGapEditingChanged
+                    )
+                    .accessibilityLabel("Top spacing")
+                    .accessibilityValue("\(Int(topGap.wrappedValue)) points")
                 }
-                SettingsSlider(
-                    value: topGap,
-                    range: topGapRange,
-                    onEditingChanged: topGapEditingChanged
-                )
-                .accessibilityLabel("Top spacing")
-                .accessibilityValue("\(Int(topGap.wrappedValue)) points")
             }
         }
     }
@@ -100,14 +116,11 @@ struct IslandInspector: View {
                 }
             }
         } label: {
-            SettingsMenuLabel(
-                symbol: "display",
-                title: displayName(for: island.placement.display)
-            )
+            SettingsMenuLabel(symbol: "display", title: displayName(for: island.placement.display))
         }
-        .menuStyle(.borderlessButton)
-        .frame(maxWidth: .infinity)
-        .settingsPopupChrome()
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
         .accessibilityLabel("Display")
         .help("Choose which display hosts this island")
     }

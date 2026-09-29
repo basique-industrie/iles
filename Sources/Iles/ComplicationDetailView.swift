@@ -10,11 +10,22 @@ struct ComplicationDetailView: View {
     let pointerOnTrailingEdge: Bool
 
     static func preferredHeight(runtime: IslandRuntime, complication: ComplicationConfiguration) -> CGFloat {
-        preferredHeight(snapshot: runtime.snapshot(sourceID: complication.sourceID), metricIDs: complication.metricIDs)
+        preferredHeight(snapshot: runtime.snapshot(sourceID: complication.sourceID), metricIDs: complication.metricIDs,
+                        descriptor: runtime.descriptor(sourceID: complication.sourceID))
     }
 
-    static func preferredHeight(snapshot: SourceSnapshot?, metricIDs: [String]) -> CGFloat {
+    static func preferredHeight(snapshot: SourceSnapshot?, metricIDs: [String], descriptor: ComplicationSourceDescriptor? = nil) -> CGFloat {
         guard let snapshot else { return 160 }
+        let details = QuotaHoverDetails(snapshot: snapshot, selectedIDs: metricIDs, descriptor: descriptor)
+        if details.metricIDs.contains(where: { snapshot.quotaResetDetails?[$0] != nil }) {
+            let rows = details.metricIDs.reduce(0) { height, id in
+                height + (details.resetMetricIDs.contains(id) ? 38 : 24)
+            }
+            let bankHeight = details.banks.reduce(0) { height, bank in
+                height + (bank.credits.availableCount > 0 ? 40 : 24) + (details.banks.count > 1 ? 14 : 0)
+            }
+            return CGFloat(min(360, max(160, 124 + rows + max(0, details.metricIDs.count - 1) * 10 + bankHeight)))
+        }
         let groups = snapshot.focusedQuotaGroups(matching: metricIDs)
         // Generic details render the selected metrics, not the source's whole
         // catalog. Mac Health can expose ten metrics behind a one-value widget.
@@ -38,7 +49,7 @@ struct ComplicationDetailView: View {
             $0.focusedQuotaGroups(matching: complication.metricIDs)
         } ?? []
 
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 7) {
                 SourceMark(
                     sourceID: complication.sourceID,
@@ -93,6 +104,7 @@ struct ComplicationDetailView: View {
             } else if let snapshot, !snapshot.values.isEmpty {
                 ScrollView {
                     metricRows(snapshot: snapshot, descriptor: descriptor)
+                    bankedResetRows(snapshot: snapshot)
                 }
             } else {
                 Text(snapshot?.errorDescription ?? "No data yet. Refresh the source or finish its setup in Settings.")
@@ -174,7 +186,7 @@ struct ComplicationDetailView: View {
             return SourceQuotaGroup(title: group.title, metricIDs: extraIDs)
         }
         return ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 10) {
                 ForEach(selectedIDs, id: \.self) { metricID in
                     groupedQuotaRow(
                         metricID: metricID,
@@ -183,12 +195,6 @@ struct ComplicationDetailView: View {
                         accent: sourceAccent,
                         resolvedSlots: resolvedSlots
                     )
-                }
-                if !selectedIDs.isEmpty, !extraGroups.isEmpty {
-                    Rectangle().fill(Color.white.opacity(0.10)).frame(height: 1)
-                    Text("More usage")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(IslandPalette.label)
                 }
                 ForEach(extraGroups, id: \.title) { group in
                     let groupAccent = ComplicationSourceStyle.accent(
@@ -211,6 +217,7 @@ struct ComplicationDetailView: View {
                         )
                     }
                 }
+                bankedResetRows(snapshot: snapshot)
                 if let error = snapshot.errorDescription {
                     Text(error)
                         .font(.system(size: 10, weight: .medium))
@@ -261,6 +268,7 @@ struct ComplicationDetailView: View {
             if let progress = value?.progress {
                 QuotaBar(percentUsed: progress * 100, color: slotIndex.map { usageStyle.color(at: $0, value: value).opacity(usageStyle.intensity(at: $0)) } ?? accent)
             }
+            resetDateRow(metricID: metricID, snapshot: snapshot)
         }
     }
 
@@ -304,6 +312,7 @@ struct ComplicationDetailView: View {
                     if let progress = value?.progress {
                         QuotaBar(percentUsed: progress * 100, color: usageStyle.color(at: index, value: value).opacity(usageStyle.intensity(at: index)))
                     }
+                    resetDateRow(metricID: metricID, snapshot: snapshot)
                 }
             }
             if !missingMetricNames.isEmpty, snapshot.errorDescription == nil {
@@ -325,6 +334,47 @@ struct ComplicationDetailView: View {
                 Label("Showing the last known value", systemImage: "clock.badge.exclamationmark")
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(IslandPalette.label)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func resetDateRow(metricID: String, snapshot: SourceSnapshot) -> some View {
+        let hover = QuotaHoverDetails(snapshot: snapshot, selectedIDs: complication.metricIDs,
+                                     descriptor: runtime.descriptor(sourceID: complication.sourceID))
+        if hover.resetMetricIDs.contains(metricID), let details = snapshot.quotaResetDetails?[metricID] {
+            TimelineView(.periodic(from: .now, by: 60)) { context in
+                Text(QuotaHoverDetails.resetCaption(details, now: context.date))
+                    .font(.system(size: 10))
+                    .foregroundStyle(IslandPalette.label)
+                    .monospacedDigit()
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func bankedResetRows(snapshot: SourceSnapshot) -> some View {
+        let banks = QuotaHoverDetails(snapshot: snapshot, selectedIDs: complication.metricIDs).banks
+        if !banks.isEmpty {
+            Rectangle().fill(Color.white.opacity(0.10)).frame(height: 1)
+            ForEach(banks) { bank in
+                VStack(alignment: .leading, spacing: 3) {
+                    if banks.count > 1, let title = bank.title {
+                        Text(title)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(IslandPalette.label)
+                    }
+                    Label(bank.caption, systemImage: "arrow.counterclockwise.circle")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.72))
+                    if let expiry = bank.expiryCaption() {
+                        Text(expiry)
+                            .font(.system(size: 10))
+                            .foregroundStyle(IslandPalette.label)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
             }
         }
     }

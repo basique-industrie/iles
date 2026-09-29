@@ -34,6 +34,16 @@ extension IlesSelfTests {
             let initial = try await provider.refresh()
             test.expectEqual(initial.quotas.first?.percentRemaining, 73, "Iles reads live command output, not quotas.json")
             test.expect(Date().timeIntervalSince(initial.capturedAt) < 5, "freshness comes from the successful live sample")
+            let source = ProviderComplicationSource(provider: provider).currentSnapshot
+            let reset = source.quotaResetDetails?["quota.key.time:Claude · work 7d"]
+            test.expectEqual(reset?.accountID, "work", "hover metadata preserves the stable Harnais account ID")
+            test.expectEqual(reset?.resetCredits?.availableCount, 2, "banked resets survive the full probe-to-hover conversion")
+            test.expectEqual(reset?.resetsAt, ISO8601DateFormatter().date(from: "2026-10-01T14:00:00Z"),
+                             "window reset date survives conversion")
+            test.expectEqual(reset?.resetCredits?.nextExpiresAt, ISO8601DateFormatter().date(from: "2026-10-12T14:00:00Z"),
+                             "credit expiry stays distinct from the scheduled reset")
+            let decoded = try JSONDecoder().decode(SourceSnapshot.self, from: JSONEncoder().encode(source))
+            test.expectEqual(decoded.quotaResetDetails, source.quotaResetDetails, "hover reset metadata survives snapshot persistence")
 
             try FileManager.default.removeItem(at: feedURL)
             try Data(#"{"hiddenTypes":["time:Claude · work 7d"]}"#.utf8)
@@ -87,8 +97,9 @@ extension IlesSelfTests {
     private static func fixture(date: Date, remaining: Int) -> String {
         """
         {"schemaVersion":1,"capturedAt":"\(ISO8601DateFormatter().string(from: date))","accounts":[
-          {"id":"work","provider":"claude","label":"Work","quotas":[
-            {"type":"time:Claude · work 7d","percentRemaining":\(remaining),"compactTitle":"7d"}
+          {"id":"work","provider":"claude","label":"Work",
+           "resetCredits":{"availableCount":2,"nextExpiresAt":"2026-10-12T14:00:00Z"},"quotas":[
+            {"type":"time:Claude · work 7d","percentRemaining":\(remaining),"compactTitle":"7d","resetsAt":"2026-10-01T14:00:00Z"}
           ]}
         ]}
         """

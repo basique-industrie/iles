@@ -1,56 +1,21 @@
 import AppKit
 import Infrastructure
 
-/// Menu extra mark. Shipped Iles stays a template symbol; Iles Dev is the same
-/// symbol tinted orange, without stretching it into a larger canvas.
+/// Two compact islands, drawn at menu-bar scale with a distinct Dev tint.
 @MainActor
 public enum MenuBarIdentityIcon {
-    public static let symbolName = "circle.hexagonpath.fill"
-
     public static func image(for identity: AppIdentity = .current) -> NSImage {
-        let symbol = NSImage(systemSymbolName: symbolName, accessibilityDescription: identity.displayName)
-            ?? NSImage(size: NSSize(width: 18, height: 18))
-        let sized = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
-        let configured = symbol.withSymbolConfiguration(sized) ?? symbol
-        guard identity.isDevelopment else {
-            let image = (configured.copy() as? NSImage) ?? configured
-            image.isTemplate = true
-            return image
+        let color: NSColor = identity.isDevelopment ? .systemOrange : .black
+        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { _ in
+            color.setFill()
+            NSBezierPath(roundedRect: NSRect(x: 2, y: 2, width: 6, height: 14),
+                         xRadius: 3, yRadius: 3).fill()
+            NSBezierPath(roundedRect: NSRect(x: 10, y: 5, width: 6, height: 8),
+                         xRadius: 3, yRadius: 3).fill()
+            return true
         }
-        return tinted(configured, color: .systemOrange)
-    }
-
-    /// Recolors a template mark at its existing size so the Dev extra matches shipped Iles.
-    static func tinted(_ image: NSImage, color: NSColor) -> NSImage {
-        let size = image.size
-        guard size.width > 0, size.height > 0 else { return image }
-        let scale = max(NSScreen.main?.backingScaleFactor ?? 2, 2)
-        guard let rep = NSBitmapImageRep(
-            bitmapDataPlanes: nil,
-            pixelsWide: Int((size.width * scale).rounded()),
-            pixelsHigh: Int((size.height * scale).rounded()),
-            bitsPerSample: 8,
-            samplesPerPixel: 4,
-            hasAlpha: true,
-            isPlanar: false,
-            colorSpaceName: .deviceRGB,
-            bytesPerRow: 0,
-            bitsPerPixel: 0
-        ) else { return image }
-        rep.size = size
-        NSGraphicsContext.saveGraphicsState()
-        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
-        NSGraphicsContext.current?.imageInterpolation = .high
-        image.draw(in: NSRect(origin: .zero, size: size))
-        if let ctx = NSGraphicsContext.current?.cgContext {
-            ctx.setBlendMode(.sourceIn)
-            ctx.setFillColor(color.cgColor)
-            ctx.fill(CGRect(origin: .zero, size: size))
-        }
-        NSGraphicsContext.restoreGraphicsState()
-        let tinted = NSImage(size: size)
-        tinted.addRepresentation(rep)
-        tinted.isTemplate = false
-        return tinted
+        image.isTemplate = !identity.isDevelopment
+        image.accessibilityDescription = identity.displayName
+        return image
     }
 }

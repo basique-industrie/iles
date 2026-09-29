@@ -36,6 +36,7 @@ struct SourceFocusControls: View {
                     source.stop()
                     didChange()
                 }
+                .disabled(source.currentMode == .idle)
             }
 
             SettingsHairline()
@@ -117,7 +118,8 @@ struct SourceClockControls: View {
         } label: {
             SettingsMenuLabel(symbol: "clock", title: "\(title) · \(Self.hourLabel(selection.wrappedValue))")
         }
-        .menuStyle(.borderlessButton)
+        .menuStyle(.button)
+        .buttonStyle(.plain)
         .menuIndicator(.hidden)
     }
 
@@ -141,7 +143,6 @@ struct SourceGitControls: View {
             subtitle: source.repositoryPath ?? "Choose the repository Iles should monitor."
         ) {
             HStack {
-                Spacer()
                 if source.repositoryPath != nil {
                     QuietButton(title: "Clear", symbol: "xmark", role: .destructive) {
                         source.clearRepository()
@@ -149,12 +150,13 @@ struct SourceGitControls: View {
                     }
                 }
                 QuietButton(
-                    title: source.repositoryPath == nil ? "Choose…" : "Change…",
+                    title: source.repositoryPath == nil ? "Choose repository…" : "Change repository…",
                     symbol: "folder",
                     prominence: .primary
                 ) {
                     chooseRepository()
                 }
+                Spacer()
             }
         }
     }

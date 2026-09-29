@@ -30,8 +30,8 @@ private enum CatalogFilter: String, CaseIterable, Identifiable {
         case .all: "All"
         case .featured: "Featured"
         case .available: "Available"
-        case .needsSetup: "Needs Setup"
-        case .inUse: "In Use"
+        case .needsSetup: "Needs setup"
+        case .inUse: "In use"
         case .new: "New"
         }
     }
@@ -44,7 +44,20 @@ struct ComplicationGallery: View {
     let configureSource: (String) -> Void
     @State private var search = ""
     @State private var category: ComplicationCategory?
-    @State private var filter: CatalogFilter = .featured
+    @State private var filter: CatalogFilter
+
+    init(
+        runtime: IslandRuntime,
+        isPresented: Binding<Bool>,
+        sourceScopeID: String?,
+        configureSource: @escaping (String) -> Void
+    ) {
+        self.runtime = runtime
+        _isPresented = isPresented
+        self.sourceScopeID = sourceScopeID
+        self.configureSource = configureSource
+        _filter = State(initialValue: sourceScopeID == nil ? .featured : .all)
+    }
 
     private let primaryFilters: [CatalogFilter] = [.featured, .all, .inUse]
 
@@ -60,6 +73,16 @@ struct ComplicationGallery: View {
             let rhsCategory = categoryOrder(for: rhs)
             if lhsCategory != rhsCategory { return lhsCategory < rhsCategory }
             return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+        }
+    }
+
+    private var availableCategories: [ComplicationCategory] {
+        guard let sourceScopeID,
+              let source = runtime.descriptor(sourceID: sourceScopeID) else {
+            return ComplicationCategory.allCases
+        }
+        return ComplicationCategory.allCases.filter { category in
+            source.complications.contains { $0.category == category }
         }
     }
 
@@ -208,8 +231,8 @@ struct ComplicationGallery: View {
                         ?? "Choose a widget for \(selectedIslandName), then adjust its data and appearance.")
                 }
                 Spacer()
-                newSourceMenu(label: "Add Source")
-                    .frame(width: 124)
+                newSourceMenu(label: "Add source")
+                    .frame(width: 160)
                 QuietIconButton(
                     symbol: "xmark",
                     accessibilityName: "Close gallery",
@@ -251,56 +274,58 @@ struct ComplicationGallery: View {
                 }
 
                 HStack(spacing: 10) {
-                IslandSegmentBar(
-                    items: primaryFilters,
-                    selection: $filter,
-                    title: { $0.title }
-                )
-                .frame(width: 250)
-                Spacer()
+                    IslandSegmentBar(
+                        items: primaryFilters,
+                        selection: $filter,
+                        title: { $0.title }
+                    )
+                    .frame(width: 250)
+                    Spacer()
 
-                Menu {
-                    Button {
-                        category = nil
+                    Menu {
+                        Button {
+                            category = nil
+                        } label: {
+                            Label("All categories", systemImage: category == nil ? "checkmark" : "square.grid.2x2")
+                        }
+                        Divider()
+                        ForEach(availableCategories, id: \.self) { item in
+                            Button {
+                                category = item
+                            } label: {
+                                Label(item.displayName, systemImage: category == item ? "checkmark" : item.gallerySymbol)
+                            }
+                        }
                     } label: {
-                        Label("All Categories", systemImage: category == nil ? "checkmark" : "square.grid.2x2")
+                        SettingsMenuLabel(
+                            symbol: category?.gallerySymbol ?? "square.grid.2x2",
+                            title: category?.displayName ?? "All categories"
+                        )
                     }
-                    Divider()
-                    ForEach(ComplicationCategory.allCases, id: \.self) { item in
-                        Button {
-                            category = item
-                        } label: {
-                            Label(item.displayName, systemImage: category == item ? "checkmark" : item.gallerySymbol)
-                        }
-                    }
-                } label: {
-                    SettingsMenuLabel(
-                        symbol: category?.gallerySymbol ?? "square.grid.2x2",
-                        title: category?.displayName ?? "All Categories"
-                    )
-                }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .frame(width: 158)
+                    .menuStyle(.button)
+                    .buttonStyle(.plain)
+                    .menuIndicator(.hidden)
+                    .frame(width: 210)
 
-                Menu {
-                    ForEach([CatalogFilter.available, .needsSetup, .new]) { item in
-                        Button {
-                            filter = item
-                        } label: {
-                            Label(item.title, systemImage: item == filter ? "checkmark" : "line.3.horizontal.decrease")
+                    Menu {
+                        ForEach([CatalogFilter.available, .needsSetup, .new]) { item in
+                            Button {
+                                filter = item
+                            } label: {
+                                Label(item.title, systemImage: item == filter ? "checkmark" : "line.3.horizontal.decrease")
+                            }
                         }
+                    } label: {
+                        SettingsMenuLabel(
+                            symbol: "line.3.horizontal.decrease",
+                            title: primaryFilters.contains(filter) ? "More filters" : filter.title
+                        )
                     }
-                } label: {
-                    SettingsMenuLabel(
-                        symbol: "line.3.horizontal.decrease",
-                        title: primaryFilters.contains(filter) ? "More filters" : filter.title
-                    )
-                }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .frame(width: 144)
-                .help("Filter widgets by availability")
+                    .menuStyle(.button)
+                    .buttonStyle(.plain)
+                    .menuIndicator(.hidden)
+                    .frame(width: 180)
+                    .help("Filter widgets by availability")
                 }
             }
             .padding(.horizontal, 24)
@@ -315,11 +340,18 @@ struct ComplicationGallery: View {
                         sourceGroup(source)
                     }
                     if sources.isEmpty {
-                        ContentUnavailableView(
-                            "No widgets found",
-                            systemImage: "magnifyingglass",
-                            description: Text("Try another source, metric, or style name.")
-                        )
+                        VStack(spacing: 12) {
+                            ContentUnavailableView(
+                                "No widgets found",
+                                systemImage: "magnifyingglass",
+                                description: Text("Try another search or reset the filters.")
+                            )
+                            QuietButton(title: "Show all widgets", symbol: "arrow.counterclockwise") {
+                                search = ""
+                                category = nil
+                                filter = .all
+                            }
+                        }
                         .foregroundStyle(IslandChrome.secondaryText)
                         .frame(maxWidth: .infinity, minHeight: 220)
                     }
@@ -338,7 +370,7 @@ struct ComplicationGallery: View {
 
     private var collectionSection: some View {
         SettingsDisclosure(title: "Starter collections", subtitle: "Add a set of widgets together") {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 240), spacing: 12)], spacing: 12) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 240), spacing: 12, alignment: .top)], spacing: 12) {
                 ForEach(collections) { collection in collectionCard(collection) }
             }
         }
@@ -393,6 +425,7 @@ struct ComplicationGallery: View {
                     Spacer()
                     StatusChip(text: ready ? "\(resolved.count) widgets" : "Setup")
                 }
+                .frame(height: 28)
                 Text(collection.name)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(IslandChrome.text)
@@ -400,9 +433,9 @@ struct ComplicationGallery: View {
                 Text(unavailableSourceName.map { "Connect \($0) to add this stack." } ?? collection.summary)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(IslandChrome.secondaryText)
-                    .lineLimit(2)
+                    .lineLimit(3, reservesSpace: true)
             }
-            .padding(10)
+            .padding(12)
             .frame(maxWidth: .infinity, minHeight: 110, alignment: .topLeading)
             .background(IslandChrome.fieldFill, in: RoundedRectangle(cornerRadius: IslandChrome.rowRadius, style: .continuous))
             .overlay {
@@ -562,7 +595,8 @@ struct ComplicationGallery: View {
         } label: {
             SettingsMenuLabel(symbol: "plus", title: label)
         }
-        .menuStyle(.borderlessButton)
+        .menuStyle(.button)
+        .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .help("Create an independent Git, GitHub, or health source")
     }

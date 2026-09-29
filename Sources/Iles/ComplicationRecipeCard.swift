@@ -98,8 +98,8 @@ struct ComplicationRecipeCard: View {
                             .monospacedDigit()
                             .lineLimit(2)
                     }
-                    if usesFixture {
-                        Text("Sample data")
+                    if needsSetup || usesFixture || unavailable {
+                        Text(unavailable ? "Unavailable" : (needsSetup ? "Set up source · Preview" : "Sample data"))
                             .font(.system(size: 11))
                             .foregroundStyle(IslandChrome.tertiaryText)
                     }
@@ -119,9 +119,8 @@ struct ComplicationRecipeCard: View {
                     .strokeBorder(IslandChrome.controlBorder, lineWidth: 1)
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SettingsActionButtonStyle())
         .disabled(unavailable)
-        .opacity(unavailable ? 0.55 : 1)
         .accessibilityLabel(unavailable
             ? "\(source.name), \(preset.name), unavailable"
             : (needsSetup

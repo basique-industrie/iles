@@ -9,7 +9,6 @@ struct ComplicationDataEditor: View {
     let descriptor: ComplicationSourceDescriptor?
     let values: [ComplicationValue]
     @State private var colorEditorIndex: Int?
-    private let chooserHeight: CGFloat = 36
 
     var body: some View {
         SettingsGroup(
@@ -119,7 +118,7 @@ struct ComplicationDataEditor: View {
                     .foregroundStyle(IslandChrome.secondaryText)
             }
             .padding(.horizontal, 9)
-            .frame(height: chooserHeight)
+            .frame(height: IslandChrome.fieldHeight)
             .background(IslandChrome.fieldFill, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -246,27 +245,15 @@ struct ComplicationDataEditor: View {
                 }
             }
         } label: {
-            HStack(spacing: 8) {
-                Image(systemName: selectedMetric?.symbol ?? selectedMetric?.kind.inspectorSymbol ?? "questionmark")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(IslandChrome.secondaryText)
-                    .frame(width: 20)
-                Text(selectedMetric?.name ?? "Choose data")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(IslandChrome.text)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 9)
-            .frame(maxWidth: .infinity, minHeight: chooserHeight, alignment: .leading)
-            .contentShape(Rectangle())
+            SettingsMenuLabel(
+                symbol: selectedMetric?.symbol ?? selectedMetric?.kind.inspectorSymbol ?? "questionmark",
+                title: selectedMetric?.name ?? "Choose data"
+            )
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.visible)
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
         .frame(maxWidth: .infinity)
-        .settingsPopupChrome()
         .disabled(candidates.isEmpty)
         .accessibilityLabel("\(metricSlotName(index: index)) data")
         .help(selectedMetric.map { "\($0.name) · \(metricDesignDescription($0, index: index))" } ?? "Choose a metric")

@@ -7,6 +7,8 @@ string with no leading `v`. Tags add the `v`.
 
 ## Unreleased
 
+## 0.2.0 - 2026-09-29
+
 ### Added
 
 - Native Harnais integration for configured Claude, Codex and Cursor accounts.
@@ -18,6 +20,20 @@ string with no leading `v`. Tags add the `v`.
 
 ### Changed
 
+- Show a rotating arc in the widget’s ring color while its source refreshes;
+  keep prior values visible and respect Reduce Motion.
+
+- Replace the generic menu-bar symbol with a compact two-island mark, retaining
+  the orange Dev tint and the system-colored shipped icon.
+- Use the bundled app icon and text-only About actions with Harnais sizing.
+- Match Harnais window chrome, sidebar navigation, typography and control states;
+  keep islands accessible from every settings page.
+- Fill the available page width when resizing Settings, Overview, About and source
+  details. Align input blocks with widget grids and adapt diagnostic actions.
+- Use consistent field heights, menu labels and spacing in source setup, island
+  placement and widget inspectors. Group About links into compact actions.
+- Keep overview and starter cards aligned. Show each account name once in paired
+  widget titles, while retaining distinct names for mixed-account widgets.
 - Compact islands keep their 48-point width. Paired usage values use two lines;
   storage readings separate the amount and unit.
 - Widget creation uses a compact preview, full-width metric and color controls,
@@ -32,6 +48,14 @@ string with no leading `v`. Tags add the `v`.
 
 ### Fixed
 
+- Hover cards show live countdowns for usage resets and account-level banked resets
+  with the next expiry. Claude keeps Fable inline without a More usage heading.
+  Fable's timer is hidden when it matches the displayed weekly reset.
+  Missing dates remain explicit and unreported credits are not shown as zero.
+- Keep disabled buttons and setup previews readable. Widget setup cards open
+  their source configuration, with realistic sample values clearly labeled.
+- Source-specific galleries show all their widgets and only relevant categories;
+  empty search results offer a filter reset.
 - Missing account data no longer causes widgets to switch to another account.
   Missing slots retain their positions in paired readings.
 - Manually removing a Harnais widget stops automatic additions for that island.

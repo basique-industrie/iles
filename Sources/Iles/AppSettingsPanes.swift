@@ -14,8 +14,8 @@ struct GeneralSettingsPane: View {
     @State private var settingsError: String?
 
     var body: some View {
-        SettingsPage(maxWidth: 720, alignment: .topLeading) {
-            SettingsPageHeader(title: "General", subtitle: "Appearance, startup and background updates.")
+        SettingsPage {
+            SettingsPageHeader(title: "Settings", subtitle: "Appearance, startup and background updates.")
 
             IslandCard(padding: 16) {
                 SettingsGroup(title: "Appearance", subtitle: "Islands keep their own colors in every appearance.") {
@@ -60,14 +60,14 @@ struct GeneralSettingsPane: View {
                             .foregroundStyle(IslandChrome.error)
                     }
                     SettingsHairline()
-                    VStack(spacing: 8) {
+                    ViewThatFits(in: .horizontal) {
                         HStack(spacing: 8) {
-                            QuietButton(title: "Open Current Log", symbol: "doc.text") { AppLog.openCurrentLogFile() }
-                            QuietButton(title: "Show Logs in Finder", symbol: "folder") { AppLog.openLogsDirectory() }
+                            logLocationActions
+                            logExportActions
                         }
-                        HStack(spacing: 8) {
-                            QuietButton(title: "Export Support Log", symbol: "square.and.arrow.up") { exportSupportLog() }
-                            QuietButton(title: "Clear Logs", symbol: "trash") { confirmsLogDeletion = true }
+                        VStack(alignment: .leading, spacing: 8) {
+                            logLocationActions
+                            logExportActions
                         }
                     }
                     SettingsCaption(text: "Support logs are redacted, limited in size, and exported only when you choose a destination.")
@@ -95,6 +95,22 @@ struct GeneralSettingsPane: View {
         }
     }
 
+    private var logLocationActions: some View {
+        HStack(spacing: 8) {
+            QuietButton(title: "Open Current Log", symbol: "doc.text") { AppLog.openCurrentLogFile() }
+            QuietButton(title: "Show Logs in Finder", symbol: "folder") { AppLog.openLogsDirectory() }
+        }
+        .fixedSize()
+    }
+
+    private var logExportActions: some View {
+        HStack(spacing: 8) {
+            QuietButton(title: "Export Support Log", symbol: "square.and.arrow.up") { exportSupportLog() }
+            QuietButton(title: "Clear Logs", symbol: "trash") { confirmsLogDeletion = true }
+        }
+        .fixedSize()
+    }
+
     private func exportSupportLog() {
         let panel = NSSavePanel()
         panel.nameFieldStringValue = AppIdentity.current.supportLogExportFileName
@@ -114,56 +130,64 @@ struct AboutSettingsPane: View {
     private var copyright: String { Bundle.main.infoDictionary?["NSHumanReadableCopyright"] as? String ?? "Copyright © 2026" }
 
     var body: some View {
-        SettingsPage(maxWidth: 720, alignment: .topLeading) {
+        SettingsPage {
             SettingsPageHeader(title: "About Iles", subtitle: "Desktop widgets for usage and local data.")
-            IslandCard(padding: 24) {
-            VStack(spacing: 9) {
-                IlesAppMark()
-                    .frame(width: 64, height: 64)
-                Text(AppIdentity.current.displayName)
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(IslandChrome.text)
-                Text(
-                    AppIdentity.current.isDevelopment
-                        ? "Development build"
-                        : "Widgets at your screen’s edge"
-                )
-                    .font(.system(size: 14))
-                    .foregroundStyle(IslandChrome.secondaryText)
-                Text("Version \(version) (\(build))")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(IslandChrome.tertiaryText)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
+            IslandCard(padding: 0) {
+                VStack(spacing: 9) {
+                    if let url = Bundle.main.url(forResource: "Iles", withExtension: "icns"),
+                       let icon = NSImage(contentsOf: url) {
+                        Image(nsImage: icon)
+                            .resizable()
+                            .interpolation(.high)
+                            .frame(width: 80, height: 80)
+                            .accessibilityHidden(true)
+                    }
+                    Text(AppIdentity.current.displayName)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(IslandChrome.text)
+                    Text(
+                        AppIdentity.current.isDevelopment
+                            ? "Development build"
+                            : "Widgets at your screen’s edge"
+                    )
+                        .font(.system(size: 14))
+                        .foregroundStyle(IslandChrome.secondaryText)
+                    Text("Version \(version) (\(build))")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(IslandChrome.tertiaryText)
+                        .textSelection(.enabled)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 36)
             }
 
             Text("Your usage data stays on this Mac. Iles has no analytics, advertising, or telemetry.")
                 .font(.system(size: 13))
                 .foregroundStyle(IslandChrome.secondaryText)
                 .multilineTextAlignment(.center)
-                .frame(maxWidth: 380)
+                .frame(maxWidth: 420)
                 .frame(maxWidth: .infinity)
 
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                QuietButton(title: "Source code", symbol: "chevron.left.forwardslash.chevron.right") {
+            HStack(spacing: 12) {
+                QuietButton(title: "Source code") {
                     openProjectPage("")
                 }
-                QuietButton(title: "Privacy", symbol: "hand.raised") {
+                QuietButton(title: "Privacy") {
                     openProjectPage("blob/main/PRIVACY.md")
                 }
-                QuietButton(title: "Licenses", symbol: "doc.plaintext") {
+                QuietButton(title: "Licenses") {
                     openProjectPage("blob/main/THIRD_PARTY_NOTICES.md")
                 }
-                QuietButton(title: "Security", symbol: "lock.shield") {
+                QuietButton(title: "Security") {
                     openProjectPage("blob/main/SECURITY.md")
                 }
             }
             .frame(maxWidth: .infinity)
 
             Text(copyright)
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 12))
                 .foregroundStyle(IslandChrome.tertiaryText)
+                .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity, alignment: .center)
         }
     }
@@ -172,31 +196,5 @@ struct AboutSettingsPane: View {
         let base = "https://github.com/basique-industrie/iles/"
         guard let url = URL(string: base + path) else { return }
         NSWorkspace.shared.open(url)
-    }
-}
-
-private struct IlesAppMark: View {
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.black)
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(IslandChrome.border, lineWidth: 1)
-            HStack(spacing: 3) {
-                ForEach([0.72, 0.5, 0.84], id: \.self) { progress in
-                    ZStack {
-                        Circle()
-                            .stroke(Color.white.opacity(0.2), lineWidth: 2.5)
-                        Circle()
-                            .trim(from: 0, to: progress)
-                            .stroke(.white, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                            .rotationEffect(.degrees(-90))
-                    }
-                    .frame(width: 12, height: 12)
-                }
-            }
-        }
-        .shadow(color: .black.opacity(0.28), radius: 8, y: 3)
-        .accessibilityHidden(true)
     }
 }

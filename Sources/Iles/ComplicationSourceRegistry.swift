@@ -7,6 +7,7 @@ import Observation
 @MainActor
 @Observable
 final class ComplicationSourceRegistry {
+    private(set) var refreshingSourceIDs: Set<String> = []
     private(set) var sources: [any ComplicationSource]
     @ObservationIgnored private var sourcesByID: [String: any ComplicationSource] = [:]
     @ObservationIgnored private var inFlightRefreshes: [String: InFlightRefresh] = [:]
@@ -63,6 +64,7 @@ final class ComplicationSourceRegistry {
         guard let index = sources.firstIndex(where: { $0.id == id }) else { return }
         inFlightRefreshes[id]?.task.cancel()
         inFlightRefreshes[id] = nil
+        refreshingSourceIDs.remove(id)
         sources.remove(at: index)
         sourcesByID[id] = nil
     }
@@ -83,6 +85,9 @@ final class ComplicationSourceRegistry {
               source.descriptor.id != source.descriptor.sourceKindID,
               configurableCatalog.remove(id: id)
         else { return false }
+        inFlightRefreshes[id]?.task.cancel()
+        inFlightRefreshes[id] = nil
+        refreshingSourceIDs.remove(id)
         if let git = source as? GitComplicationSource { git.clearRepository() }
         if let github = source as? GitHubComplicationSource { github.clearRepository() }
         if let endpoint = source as? ServiceMonitorComplicationSource { endpoint.clearEndpoint() }
@@ -125,6 +130,7 @@ final class ComplicationSourceRegistry {
     func cancelRefreshes() {
         for refresh in inFlightRefreshes.values { refresh.task.cancel() }
         inFlightRefreshes.removeAll()
+        refreshingSourceIDs.removeAll()
     }
 
     private func refreshSingleFlight(
@@ -136,11 +142,13 @@ final class ComplicationSourceRegistry {
         }
 
         let token = UUID()
+        refreshingSourceIDs.insert(source.id)
         let task = Task { await source.refresh(kind) }
         inFlightRefreshes[source.id] = InFlightRefresh(token: token, task: task)
         let snapshot = await task.value
         if inFlightRefreshes[source.id]?.token == token {
             inFlightRefreshes[source.id] = nil
+            refreshingSourceIDs.remove(source.id)
         }
         return snapshot
     }

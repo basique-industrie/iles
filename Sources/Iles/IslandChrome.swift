@@ -13,7 +13,9 @@ enum IslandChrome {
     static let buttonHeight: CGFloat = 28
     static let smallButtonHeight: CGFloat = 24
     static let fieldHeight: CGFloat = 28
-    static let contentMaxWidth: CGFloat = 680
+    static let sidebarWidth: CGFloat = 260
+    static let pageTop: CGFloat = 16
+    static let pageBottom: CGFloat = 32
 
     // MARK: Adaptive helpers
     private static func adaptive(light: NSColor, dark: NSColor) -> Color {
@@ -83,6 +85,18 @@ enum IslandChrome {
         adaptiveNS(light: rgb(252, 252, 252), dark: rgb(10, 10, 10))
     }
 
+    static var sidebarNSColor: NSColor {
+        adaptiveNS(light: rgb(250, 250, 250), dark: rgb(17, 17, 17))
+    }
+
+    static var rowSelected: Color {
+        adaptive(light: rgb(244, 244, 245), dark: white(0.04))
+    }
+
+    static var rowHover: Color {
+        adaptive(light: rgb(250, 250, 250), dark: white(0.03)).opacity(0.25)
+    }
+
     // MARK: Component colors
     static var cardFill: Color {
         adaptive(light: white(0.40), dark: rgb(17, 17, 17, 0.40))
@@ -92,13 +106,9 @@ enum IslandChrome {
         adaptive(light: rgb(255, 255, 255), dark: white(0.08))
     }
 
-    static var selectedFill: Color {
-        adaptive(light: rgb(255, 255, 255), dark: white(0.08))
-    }
+    static var selectedFill: Color { rowSelected }
 
-    static var hoverFill: Color {
-        adaptive(light: rgb(228, 228, 231), dark: white(0.12))
-    }
+    static var hoverFill: Color { rowHover }
 
     static var hairline: Color {
         adaptive(light: rgb(228, 228, 231, 0.60), dark: white(0.036))
@@ -123,7 +133,7 @@ struct PageTitle: View {
 
     var body: some View {
         Text(title)
-            .font(.system(size: 22, weight: .semibold))
+            .font(.system(size: 20, weight: .semibold))
             .foregroundStyle(IslandChrome.text)
     }
 }

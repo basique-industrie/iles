@@ -9,7 +9,7 @@ struct IslandOverviewView: View {
     let showSources: () -> Void
 
     var body: some View {
-        SettingsPage(maxWidth: 1040) {
+        SettingsPage {
             SettingsPageHeader(title: "Your islands", subtitle: "Check your data, then choose an island to edit.") {
                 QuietButton(title: "Add island", symbol: "plus", prominence: .primary) {
                     runtime.workspaceStore.addIsland()
@@ -22,7 +22,7 @@ struct IslandOverviewView: View {
                                        description: Text("Add an island, then choose the usage and system widgets you want on your desktop."))
                     .frame(maxWidth: .infinity, minHeight: 240)
             } else {
-                LazyVGrid(columns: runtime.workspaceStore.islands.count == 1 ? [GridItem(.flexible())] : [GridItem(.adaptive(minimum: 340), spacing: 20)], alignment: .leading, spacing: 20) {
+                LazyVGrid(columns: runtime.workspaceStore.islands.count == 1 ? [GridItem(.flexible())] : [GridItem(.adaptive(minimum: 340), spacing: 20, alignment: .top)], alignment: .leading, spacing: 20) {
                     ForEach(runtime.workspaceStore.islands) { island in
                         islandCard(island)
                     }
@@ -83,7 +83,7 @@ struct IslandOverviewView: View {
 
     private func overviewRow(_ item: ComplicationConfiguration) -> some View {
         let descriptor = runtime.descriptor(sourceID: item.sourceID)
-        let name = item.metricIDs.map { descriptor?.metricName(for: $0) ?? ComplicationMetricDescriptor.fallbackName(for: $0) }.joined(separator: " + ")
+        let name = HarnaisGlance.metricSummary(sourceID: item.sourceID, metricIDs: item.metricIDs, descriptor: descriptor)
         let hidden = !item.isVisible || runtime.isHiddenBySource(item)
         let quality = runtime.quality(for: item)
         return HStack(spacing: 10) {
@@ -110,6 +110,7 @@ struct IslandOverviewView: View {
             }
             .fixedSize(horizontal: true, vertical: false)
         }
+        .frame(minHeight: 42)
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
     }

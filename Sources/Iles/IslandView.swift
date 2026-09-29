@@ -85,7 +85,7 @@ struct IslandView: View {
             sourceError: runtime.snapshot(sourceID: complication.sourceID)?.errorDescription,
             quality: runtime.quality(for: complication),
             trendDirection: runtime.trendDirection(for: complication),
-            isSyncing: runtime.provider(id: complication.sourceID)?.isSyncing == true,
+            isSyncing: runtime.isRefreshingSource(complication.sourceID),
             isSelected: selectedComplicationID == complication.id
                 || runtime.selection == ComplicationSelection(islandID: islandID, complicationID: complication.id)
         )

@@ -211,6 +211,10 @@ final class IslandRuntime {
         sourceRegistry.cancelRefreshes()
     }
 
+    func isRefreshingSource(_ id: String) -> Bool {
+        sourceRegistry.refreshingSourceIDs.contains(id) || provider(id: id)?.isSyncing == true
+    }
+
     func refreshNow() {
         BinaryLocator.invalidateCaches()
         refreshTask?.cancel()

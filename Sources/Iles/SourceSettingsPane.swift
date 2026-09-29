@@ -23,7 +23,7 @@ private enum SourceListFilter: String, CaseIterable, Identifiable {
         switch self {
         case .all: "All Sources"
         case .inUse: "In Use"
-        case .needsSetup: "Needs Setup"
+        case .needsSetup: "Needs setup"
         case .usage: "Usage Providers"
         case .system: "Mac Health"
         case .time: "Time & Calendar"
@@ -49,7 +49,7 @@ private enum SourceOperationalState: Equatable {
         case .ready: "Ready"
         case .stale: "Out of date"
         case .syncing: "Syncing"
-        case .needsSetup: "Needs Setup"
+        case .needsSetup: "Needs setup"
         case .unavailable: "Unavailable"
         case .available: "Available"
         }
@@ -223,7 +223,7 @@ struct SourceSettingsPane: View {
                         .lineLimit(2)
                     HStack(spacing: 4) {
                         Text(state.title)
-                        if entry.usageCount > 0 { Text("· \(entry.usageCount) widgets") }
+                        if entry.usageCount > 0 { Text("· \(entry.usageCount) widget\(entry.usageCount == 1 ? "" : "s")") }
                     }
                     .font(.system(size: 11))
                     .foregroundStyle(state == .stale || state == .needsSetup ? IslandChrome.warning : IslandChrome.secondaryText)
@@ -233,11 +233,11 @@ struct SourceSettingsPane: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 10)
             .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
-            .background(selected ? IslandChrome.track : .clear, in: RoundedRectangle(cornerRadius: 8))
+            .background(selected ? IslandChrome.rowSelected : .clear, in: RoundedRectangle(cornerRadius: 8))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(source.name), \(state.title), used \(entry.usageCount) times")
+        .accessibilityLabel("\(source.name), \(state.title), used \(entry.usageCount) time\(entry.usageCount == 1 ? "" : "s")")
         .task(id: source.id) { await checkUsageProviderReadiness(for: source) }
     }
 
@@ -245,133 +245,145 @@ struct SourceSettingsPane: View {
     private var sourceDetail: some View {
         if let source = runtime.catalogSources.first(where: { $0.id == selectedSourceID }) {
             let state = operationalState(for: source)
-            SettingsPage(maxWidth: 800, alignment: .top) {
-                HStack(spacing: 10) {
-                    SourceMark(sourceID: source.id, descriptor: source, size: 18, tint: .labelColor)
-                        .frame(width: 28, height: 28)
-                    PageTitle(title: source.name)
-                    Spacer()
-                    if state == .needsSetup || state == .unavailable {
-                        SettingsStatusLine(title: state.title, attention: true)
-                    }
-                    QuietButton(
-                        title: "Add widget",
-                        symbol: "plus",
-                        prominence: .primary
-                    ) {
-                        browseComplications()
-                    }
-                    .disabled(state == .needsSetup || state == .unavailable)
-                    Menu {
-                        Button {
-                            _ = runtime.refreshSource(source.id)
-                        } label: {
-                            Label("Refresh Source", systemImage: "arrow.clockwise")
+            ScrollViewReader { proxy in
+                SettingsPage {
+                    HStack(spacing: 10) {
+                        SourceMark(sourceID: source.id, descriptor: source, size: 18, tint: .labelColor)
+                            .frame(width: 28, height: 28)
+                        PageTitle(title: source.name)
+                        Spacer()
+                        if state == .needsSetup || state == .unavailable {
+                            SettingsStatusLine(title: state.title, attention: true)
                         }
-                        if let url = runtime.provider(id: source.id)?.dashboardURL ?? source.actionURL {
-                            Button {
-                                NSWorkspace.shared.open(url)
-                            } label: {
-                                Label(
-                                    source.sourceKindID == ConfigurableSourceKind.gitRepository.sourceKindID
-                                        ? "Open Repository"
-                                        : "Open Dashboard",
-                                    systemImage: source.sourceKindID == ConfigurableSourceKind.gitRepository.sourceKindID
-                                        ? "folder"
-                                        : "arrow.up.forward.app"
-                                )
-                            }
+                        QuietButton(
+                            title: "Add widget",
+                            symbol: "plus",
+                            prominence: .primary
+                        ) {
+                            browseComplications()
                         }
-                        if let kind = source.configurableKind {
-                            Divider()
+                        .disabled(state == .needsSetup || state == .unavailable)
+                        .help(state == .needsSetup
+                              ? "Complete source setup to add a widget."
+                              : (state == .unavailable ? "This source must be available before adding a widget." : "Add a widget from this source."))
+                        .accessibilityHint(state == .needsSetup
+                                           ? "Complete source setup first."
+                                           : (state == .unavailable ? "Source unavailable." : ""))
+                        Menu {
                             Button {
-                                selectedSourceID = runtime.addSource(kind: kind)
+                                _ = runtime.refreshSource(source.id)
                             } label: {
-                                Label("Add Another \(kind.title)", systemImage: "plus")
+                                Label("Refresh Source", systemImage: "arrow.clockwise")
                             }
-                            if source.id != kind.sourceKindID {
-                                Button(role: .destructive) {
-                                    if runtime.removeSource(source.id) {
-                                        selectedSourceID = kind.sourceKindID
-                                    }
+                            if let url = runtime.provider(id: source.id)?.dashboardURL ?? source.actionURL {
+                                Button {
+                                    NSWorkspace.shared.open(url)
                                 } label: {
-                                    Label("Remove Source", systemImage: "trash")
+                                    Label(
+                                        source.sourceKindID == ConfigurableSourceKind.gitRepository.sourceKindID
+                                            ? "Open Repository"
+                                            : "Open Dashboard",
+                                        systemImage: source.sourceKindID == ConfigurableSourceKind.gitRepository.sourceKindID
+                                            ? "folder"
+                                            : "arrow.up.forward.app"
+                                    )
                                 }
-                                .disabled(usageCount(for: source.id) > 0)
                             }
+                            if let kind = source.configurableKind {
+                                Divider()
+                                Button {
+                                    selectedSourceID = runtime.addSource(kind: kind)
+                                } label: {
+                                    Label("Add Another \(kind.title)", systemImage: "plus")
+                                }
+                                if source.id != kind.sourceKindID {
+                                    Button(role: .destructive) {
+                                        if runtime.removeSource(source.id) {
+                                            selectedSourceID = kind.sourceKindID
+                                        }
+                                    } label: {
+                                        Label("Remove Source", systemImage: "trash")
+                                    }
+                                    .disabled(usageCount(for: source.id) > 0)
+                                }
+                            }
+                        } label: {
+                            RowActionGlyph(symbol: "ellipsis")
                         }
-                    } label: {
-                        RowActionGlyph(symbol: "ellipsis")
+                        .menuStyle(.borderlessButton)
+                        .menuIndicator(.hidden)
+                        .help("Source actions")
                     }
-                    .menuStyle(.borderlessButton)
-                    .menuIndicator(.hidden)
-                    .help("Source actions")
-                }
 
-                if let brand = ProviderBrand(rawValue: source.id),
-                   state == .needsSetup || state == .unavailable {
-                    SettingsNotice(text: brand.setupInstruction, style: .warning)
-                } else if let error = runtime.snapshot(sourceID: source.id)?.errorDescription {
-                    SettingsNotice(text: error, style: .warning)
-                }
+                    if let brand = ProviderBrand(rawValue: source.id),
+                       state == .needsSetup || state == .unavailable {
+                        SettingsNotice(text: brand.setupInstruction, style: .warning)
+                    } else if let error = runtime.snapshot(sourceID: source.id)?.errorDescription {
+                        SettingsNotice(text: error, style: .warning)
+                    }
 
-                if source.id == HarnaisWeeklyStarter.sourceID {
-                    HarnaisUsageStatusView(runtime: runtime)
-                }
+                    if source.id == HarnaisWeeklyStarter.sourceID {
+                        HarnaisUsageStatusView(runtime: runtime)
+                    }
 
-                if hasConfigurationSection(for: source), state == .needsSetup || state == .unavailable {
-                    sourceConfigurationSection(source, state: state)
-                    SettingsHairline()
-                }
+                    if hasConfigurationSection(for: source), state == .needsSetup || state == .unavailable {
+                        sourceConfigurationCard(source, state: state)
+                    }
 
-                sourceComplicationSection(source)
+                    sourceComplicationSection(source) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            proxy.scrollTo("configuration-\(source.id)", anchor: .top)
+                        }
+                    }
                     .task(id: source.id) {
                         await loadSelectedUsageSource(source)
                     }
 
-                if hasConfigurationSection(for: source), state != .needsSetup && state != .unavailable {
-                    SettingsHairline()
-                    sourceConfigurationSection(source, state: state)
-                    SettingsHairline()
-                }
+                    if hasConfigurationSection(for: source), state != .needsSetup && state != .unavailable {
+                        sourceConfigurationCard(source, state: state)
+                    }
 
-                SettingsDisclosure(
-                    title: "Available data",
-                    subtitle: "\(source.metrics.count) values available for custom widgets"
-                ) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        ForEach(source.metrics) { metric in
-                            HStack(spacing: 9) {
-                                Image(systemName: metric.symbol ?? metric.kind.inspectorSymbol)
-                                    .symbolRenderingMode(.monochrome)
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(IslandChrome.text)
-                                    .frame(width: 26, height: 26)
-                                    .background(IslandChrome.fieldFill, in: Circle())
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(metric.name)
-                                        .font(.system(size: 14, weight: .medium))
+                    SettingsDisclosure(
+                        title: "Available data",
+                        subtitle: "\(source.metrics.count) values available for custom widgets"
+                    ) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            ForEach(source.metrics) { metric in
+                                HStack(spacing: 9) {
+                                    Image(systemName: metric.symbol ?? metric.kind.inspectorSymbol)
+                                        .symbolRenderingMode(.monochrome)
+                                        .font(.system(size: 12, weight: .semibold))
                                         .foregroundStyle(IslandChrome.text)
-                                    Text(metricSourceSummary(metric))
-                                        .font(.system(size: 12, weight: .medium))
-                                        .foregroundStyle(IslandChrome.tertiaryText)
+                                        .frame(width: 26, height: 26)
+                                        .background(IslandChrome.fieldFill, in: Circle())
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(metric.name)
+                                            .font(.system(size: 14, weight: .medium))
+                                            .foregroundStyle(IslandChrome.text)
+                                        Text(metricSourceSummary(metric))
+                                            .font(.system(size: 12, weight: .medium))
+                                            .foregroundStyle(IslandChrome.tertiaryText)
+                                    }
+                                    Spacer()
+                                    Text(metricDisplayValue(metric, source: source))
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(IslandChrome.secondaryText)
+                                        .monospacedDigit()
                                 }
-                                Spacer()
-                                Text(metricDisplayValue(metric, source: source))
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(IslandChrome.secondaryText)
-                                    .monospacedDigit()
+                                if metric.id != source.metrics.last?.id { SettingsHairline() }
                             }
-                            if metric.id != source.metrics.last?.id { SettingsHairline() }
                         }
                     }
+                    .id(source.id)
                 }
-                .id(source.id)
             }
         }
     }
 
-    private func sourceComplicationSection(_ source: ComplicationSourceDescriptor) -> some View {
+    private func sourceComplicationSection(
+        _ source: ComplicationSourceDescriptor,
+        configureSource: @escaping () -> Void
+    ) -> some View {
         let recommendations = source.complications.sorted {
             if $0.isFeatured != $1.isFeatured { return $0.isFeatured && !$1.isFeatured }
             if $0.rank != $1.rank { return $0.rank > $1.rank }
@@ -380,11 +392,11 @@ struct SourceSettingsPane: View {
         return SettingsGroup(title: "Widgets") {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 280), spacing: 12)], spacing: 12) {
                 ForEach(Array(recommendations.prefix(6))) { preset in
-                    sourceComplicationCard(source: source, preset: preset)
+                    sourceComplicationCard(source: source, preset: preset, configureSource: configureSource)
                 }
             }
             if recommendations.count > 6 {
-                QuietButton(title: "View All", symbol: "chevron.right") {
+                QuietButton(title: "View all widgets", symbol: "chevron.right") {
                     browseComplications()
                 }
             }
@@ -406,6 +418,19 @@ struct SourceSettingsPane: View {
             || source.kind == .extensionSource
     }
 
+    private func sourceConfigurationCard(
+        _ source: ComplicationSourceDescriptor,
+        state: SourceOperationalState
+    ) -> some View {
+        IslandCard(padding: 16) {
+            VStack(alignment: .leading, spacing: 12) {
+                sourceConfigurationSection(source, state: state)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .id("configuration-\(source.id)")
+    }
+
     @ViewBuilder
     private func sourceConfigurationSection(
         _ source: ComplicationSourceDescriptor,
@@ -419,7 +444,6 @@ struct SourceSettingsPane: View {
             )
             if brand == .claude { claudeSessionLink }
         } else if source.id == "session.claude" {
-            SettingsCaption(text: "Receives live session, task, and subagent events from Claude Code.")
             ClaudeHooksSection(runtime: runtime)
         } else if source.id == "system.clock",
                   let clock = runtime.sourceRegistry.source(id: source.id) as? ClockComplicationSource {
@@ -462,11 +486,13 @@ struct SourceSettingsPane: View {
 
     private func sourceComplicationCard(
         source: ComplicationSourceDescriptor,
-        preset: ComplicationDescriptor
+        preset: ComplicationDescriptor,
+        configureSource: @escaping () -> Void
     ) -> some View {
         let state = operationalState(for: source)
         let isAvailable = state == .ready || state == .available || state == .syncing || state == .stale
-        return ComplicationRecipeCard(runtime: runtime, source: source, preset: preset, configureSource: {}) {
+        return ComplicationRecipeCard(runtime: runtime, source: source, preset: preset, configureSource: configureSource) {
+            guard isAvailable else { configureSource(); return }
             if runtime.workspaceStore.selectedIsland == nil { runtime.workspaceStore.addIsland() }
             guard let islandID = runtime.workspaceStore.selectedIslandID else { return }
             _ = runtime.workspaceStore.addComplication(
@@ -482,7 +508,7 @@ struct SourceSettingsPane: View {
             _ = runtime.refreshSource(source.id)
             runtime.settingsSection = .islands
         }
-        .disabled(!isAvailable)
+        .disabled(state == .unavailable)
     }
 
     private var claudeSessionLink: some View {

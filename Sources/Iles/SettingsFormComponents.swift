@@ -9,29 +9,17 @@ struct SettingsHairline: View {
 }
 
 struct SettingsPage<Content: View>: View {
-    var maxWidth: CGFloat
-    var alignment: Alignment
     @ViewBuilder var content: () -> Content
-
-    init(
-        maxWidth: CGFloat = IslandChrome.contentMaxWidth,
-        alignment: Alignment = .topLeading,
-        @ViewBuilder content: @escaping () -> Content
-    ) {
-        self.maxWidth = maxWidth
-        self.alignment = alignment
-        self.content = content
-    }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: IslandChrome.stackSpacing) {
                 content()
             }
-            .frame(maxWidth: maxWidth, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, IslandChrome.pageInset)
-            .padding(.vertical, IslandChrome.pageInset)
-            .frame(maxWidth: .infinity, alignment: alignment)
+            .padding(.top, IslandChrome.pageTop)
+            .padding(.bottom, IslandChrome.pageBottom)
         }
         .scrollIndicators(.hidden)
     }

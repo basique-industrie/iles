@@ -41,6 +41,63 @@ extension IlesSelfTests {
         test.expectEqual(ComplicationDetailView.preferredHeight(snapshot: systemSnapshot, metricIDs: []), 204,
                          "generic fallback sizes only its two rendered readings")
         let storageLabel = CompactByteLabel(value: .value("56.74 GB", unit: nil))
+        let resetDate = Date(timeIntervalSince1970: 2_000_000_000)
+        let bank = ResetCredits(availableCount: 2, nextExpiresAt: resetDate)
+        let quotaSnapshot = SourceSnapshot(sourceID: "harnais", values: [:], quotaGroups: [
+            SourceQuotaGroup(title: "Claude · Personal", metricIDs: ["session", "weekly", "fable"]),
+            SourceQuotaGroup(title: "Claude · Work", metricIDs: ["work"])
+        ], quotaResetDetails: [
+            "session": QuotaResetDetails(resetsAt: resetDate, accountID: "personal", resetCredits: bank),
+            "weekly": QuotaResetDetails(resetsAt: resetDate, accountID: "personal", resetCredits: bank),
+            "fable": QuotaResetDetails(resetsAt: resetDate, accountID: "personal", resetCredits: bank),
+            "work": QuotaResetDetails(accountID: "work", resetCredits: ResetCredits(availableCount: 0))
+        ])
+        let hover = QuotaHoverDetails(snapshot: quotaSnapshot, selectedIDs: ["session", "weekly"])
+        test.expectEqual(hover.metricIDs, ["session", "weekly", "fable"], "hover includes Fable once after the selected Claude windows")
+        test.expectEqual(hover.resetMetricIDs, Set(["session", "weekly"]), "Fable does not repeat the same account's weekly reset")
+        let separateResets = SourceSnapshot(sourceID: "harnais", values: [:], quotaResetDetails: [
+            "weekly": QuotaResetDetails(resetsAt: resetDate, accountID: "work"),
+            "fable": QuotaResetDetails(resetsAt: resetDate, accountID: "personal")
+        ])
+        test.expect(QuotaHoverDetails(snapshot: separateResets, selectedIDs: ["weekly", "fable"]).resetMetricIDs.contains("fable"),
+                    "matching dates on different accounts do not hide a reset")
+        test.expect(QuotaHoverDetails(snapshot: separateResets, selectedIDs: ["fable"]).resetMetricIDs.contains("fable"),
+                    "Fable keeps its timer when Weekly is not displayed")
+        let differentResets = SourceSnapshot(sourceID: "harnais", values: [:], quotaResetDetails: [
+            "weekly": QuotaResetDetails(resetsAt: resetDate, accountID: "personal"),
+            "fable": QuotaResetDetails(resetsAt: resetDate.addingTimeInterval(3_600), accountID: "personal")
+        ])
+        test.expect(QuotaHoverDetails(snapshot: differentResets, selectedIDs: ["weekly", "fable"]).resetMetricIDs.contains("fable"),
+                    "Fable retains a different reset timer")
+        let countdown = QuotaResetDetails(resetsAt: resetDate)
+        test.expectEqual(QuotaHoverDetails.resetCaption(countdown, now: resetDate.addingTimeInterval(-183_780)), "Resets in 2d 3h 3m",
+                         "weekly reset is a days, hours and minutes countdown")
+        test.expectEqual(QuotaHoverDetails.resetCaption(countdown, now: resetDate.addingTimeInterval(-7_260)), "Resets in 2h 1m",
+                         "session reset uses hours and minutes")
+        test.expectEqual(QuotaHoverDetails.resetCaption(countdown, now: resetDate.addingTimeInterval(-7_200)), "Resets in 2h",
+                         "timer decreases as the clock advances")
+        test.expectEqual(QuotaHoverDetails.resetCaption(countdown, now: resetDate.addingTimeInterval(-30)), "Resets in less than a minute",
+                         "sub-minute resets do not show zero remaining")
+        test.expectEqual(QuotaHoverDetails.resetCaption(countdown, now: resetDate), "Reset due · refresh usage",
+                         "elapsed resets do not invent a new quota period")
+        test.expectEqual(hover.banks.count, 1, "a paired account hover shows its bank once")
+        test.expectEqual(hover.banks.first?.credits.availableCount, 2, "another account's bank cannot leak into this hover")
+        test.expectEqual(QuotaHoverDetails(snapshot: quotaSnapshot, selectedIDs: ["weekly", "work"]).banks.count, 2,
+                         "mixed-account widgets keep separate banks")
+        test.expectEqual(QuotaHoverDetails(snapshot: quotaSnapshot, selectedIDs: ["work"]).banks.first?.caption, "0 banked resets",
+                         "a reported zero is displayed explicitly")
+        test.expect(QuotaHoverDetails(snapshot: systemSnapshot, selectedIDs: ["metric0"]).banks.isEmpty,
+                    "unreported bank information is never fabricated")
+        test.expect(hover.banks.first?.expiryCaption(now: resetDate.addingTimeInterval(-1))?.hasPrefix("Next expires") == true,
+                    "available bank shows its expiry date")
+        test.expect(hover.banks.first?.expiryCaption(now: resetDate)?.hasPrefix("Expiry reached") == true,
+                    "expired cached credits are identified without inventing a replacement count")
+        test.expectEqual(QuotaHoverDetails.resetCaption(QuotaResetDetails(resetText: "resets tomorrow")), "Resets tomorrow",
+                         "provider reset text remains available when no timestamp exists")
+        test.expectEqual(QuotaHoverDetails.resetCaption(QuotaResetDetails()), "Reset not reported",
+                         "missing reset dates remain explicit")
+        test.expect(ComplicationDetailView.preferredHeight(snapshot: quotaSnapshot, metricIDs: ["session", "weekly"]) > 240,
+                    "hover reserves space for window dates and bank expiry without the More usage section")
         test.expectEqual(storageLabel?.amount, "56.74", "compact storage retains the exact amount")
         test.expectEqual(storageLabel?.unit, "GB", "compact storage places the unit on its own line")
         test.expectEqual(CompactByteLabel(value: .value("56,74\u{202F}Go", unit: nil))?.amount, "56,74",
@@ -70,6 +127,11 @@ extension IlesSelfTests {
             HarnaisGlance.accountLabel(sourceID: sourceID, metricIDs: [sessionID, weeklyID], descriptor: renamed),
             "Work 1",
             "island account labels follow current aliases rather than stored keys"
+        )
+        test.expectEqual(
+            HarnaisGlance.metricSummary(sourceID: sourceID, metricIDs: [sessionID, weeklyID], descriptor: renamed),
+            "Claude · Work 1 · Session + Weekly",
+            "list titles use the current account once while preserving both windows"
         )
         test.expectEqual(
             HarnaisGlance.slotCaption(sourceID: sourceID, metricID: sessionID, descriptor: renamed),
@@ -119,6 +181,11 @@ extension IlesSelfTests {
             (sessionID, "Claude · Personal · 5h"),
             (weeklyID, "Claude · Work · 7d"),
         ])
+        test.expectEqual(
+            HarnaisGlance.metricSummary(sourceID: sourceID, metricIDs: [sessionID, weeklyID], descriptor: mixed),
+            "Claude · Personal · 5h + Claude · Work · 7d",
+            "list titles retain both identities for widgets spanning accounts"
+        )
         test.expect(
             HarnaisGlance.accountLabel(sourceID: sourceID, metricIDs: [sessionID, weeklyID], descriptor: mixed) == nil,
             "multi-account widgets are not mislabeled as one account"
