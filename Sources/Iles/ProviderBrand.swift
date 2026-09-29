@@ -324,7 +324,7 @@ enum IlesResourceBundle {
 
     /// Packaged apps keep `Iles_IlesCore.bundle` under `Contents/Resources`.
     /// SPM's `Bundle.module` looks next to the `.app`, which codesign rejects.
-    static func resolve(applicationBundle: Bundle, moduleBundle: Bundle) -> Bundle {
+    static func resolve(applicationBundle: Bundle, moduleBundle: @autoclosure () -> Bundle) -> Bundle {
         let candidates = [
             applicationBundle.bundleURL.appendingPathComponent("Iles_IlesCore.bundle"),
             applicationBundle.resourceURL?.appendingPathComponent("Iles_IlesCore.bundle"),
@@ -334,7 +334,7 @@ enum IlesResourceBundle {
                 return bundle
             }
         }
-        return moduleBundle
+        return moduleBundle()
     }
 }
 

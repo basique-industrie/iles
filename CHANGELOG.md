@@ -7,6 +7,11 @@ string with no leading `v`. Tags add the `v`.
 
 ## Unreleased
 
+## 0.2.2 - 2026-09-29
+
+- Load packaged icons without evaluating SwiftPM's build-machine resource fallback, fixing startup on other Macs.
+- Retain the island configuration and interface improvements from 0.2.0 and 0.2.1.
+
 ## 0.2.1 - 2026-09-29
 
 - Fix an Intel release compiler timeout in the hover-panel height calculation.

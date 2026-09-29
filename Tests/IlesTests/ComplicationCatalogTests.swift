@@ -1316,7 +1316,13 @@ extension IlesSelfTests {
             return
         }
 
-        let packaged = IlesResourceBundle.resolve(applicationBundle: application, moduleBundle: emptyModule)
+        var fallbackEvaluated = false
+        func moduleFallback() -> Bundle {
+            fallbackEvaluated = true
+            return emptyModule
+        }
+        let packaged = IlesResourceBundle.resolve(applicationBundle: application, moduleBundle: moduleFallback())
+        test.expect(!fallbackEvaluated, "packaged lookup never evaluates the build-machine module fallback")
         test.expect(
             packaged.bundleURL.path.hasSuffix("Contents/Resources/Iles_IlesCore.bundle"),
             "packaged layout resolves Iles_IlesCore.bundle from Contents/Resources"
@@ -1344,8 +1350,9 @@ extension IlesSelfTests {
         }
         let fallback = IlesResourceBundle.resolve(
             applicationBundle: missingApplication,
-            moduleBundle: emptyModule
+            moduleBundle: moduleFallback()
         )
+        test.expect(fallbackEvaluated, "development lookup evaluates the module fallback only when needed")
         test.expectEqual(
             fallback.bundleURL.path,
             emptyModule.bundleURL.path,
