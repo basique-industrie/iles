@@ -145,7 +145,7 @@ jobs:
 
       - name: Preserve signed Harnais artifacts
         if: ${{ inputs.product == 'harnais' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Harnais-notarized
           path: |
