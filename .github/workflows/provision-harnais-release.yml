@@ -1,0 +1,42 @@
+# Rotate Harnais signing credentials without exposing plaintext outside the
+# protected Iles job. The recipient is fixed to Harnais's release environment.
+name: Provision Harnais release
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: provision-harnais-release
+  cancel-in-progress: false
+jobs:
+  encrypt:
+    if: github.repository == 'basique-industrie/iles' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: release
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install encryption library before exposing secrets
+        run: |
+          python3 -m venv "$RUNNER_TEMP/encryption"
+          "$RUNNER_TEMP/encryption/bin/pip" install --disable-pip-version-check PyNaCl==1.6.2
+      - name: Encrypt for Harnais's protected release environment
+        env:
+          APPLE_DEVELOPER_ID_APPLICATION_P12: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION_P12 }}
+          APPLE_DEVELOPER_ID_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_PASSWORD }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_KEY_ISSUER: ${{ secrets.APPLE_NOTARY_KEY_ISSUER }}
+          APPLE_NOTARY_KEY_P8: ${{ secrets.APPLE_NOTARY_KEY_P8 }}
+          HARNAIS_NATIVE_OAUTH_CATALOG: ${{ secrets.HARNAIS_NATIVE_OAUTH_CATALOG }}
+        run: '"$RUNNER_TEMP/encryption/bin/python" scripts/encrypt-harnais-release-secrets.py'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Harnais-encrypted-release-secrets
+          path: ${{ runner.temp }}/harnais-encrypted-secrets.json
+          if-no-files-found: error
+          retention-days: 1
+      - name: Remove encrypted transfer file
+        if: always()
+        run: rm -f "$RUNNER_TEMP/harnais-encrypted-secrets.json"
